@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="../Artifacts.Tests/Artifacts.Tests.csproj" Id="b352efac-3812-44b0-9e99-61cdb4c84579" />
+  <Project Path="Artifacts.csproj" />
+</Solution>

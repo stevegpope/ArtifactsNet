@@ -1,0 +1,49 @@
+﻿using ArtifactsMmoClient.Api;
+using ArtifactsMmoClient.Client;
+using ArtifactsMmoClient.Model;
+
+namespace Artifacts
+{
+    internal class Map
+    {
+        private MapsApi _api;
+        private static Configuration _config;
+        private static HttpClient _httpClient;
+
+        internal static Map Instance => lazy.Value;
+
+        internal static void Config(
+            Configuration config,
+            HttpClient httpClient
+            )
+        {
+            _config = config;
+            _httpClient = httpClient;
+        }
+
+        private static readonly Lazy<Map> lazy =
+            new(() =>
+            {
+                if (_config == null || _httpClient == null)
+                {
+                    throw new InvalidOperationException("Map not configured. Call Map.Config() before accessing the Instance.");
+                }
+                return new Map(_config, _httpClient);
+            });
+            
+        private Map(
+            Configuration config,
+            HttpClient httpClient
+            )
+        {
+            _api = new MapsApi(httpClient, config);
+        }
+
+        internal async Task<DataPageMapSchema> GetMapLayer(MapContentType contentType, string code = null, MapLayer layer = MapLayer.Overworld)
+        {
+            var mapSchema = await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code);
+            Console.WriteLine($"Retrieved map layer: {layer}, content type: {contentType}, code: {code ?? "N/A"}: {mapSchema.Total} results");
+            return mapSchema;
+        }
+    }
+}

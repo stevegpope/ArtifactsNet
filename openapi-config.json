@@ -1,0 +1,20 @@
+{
+  "packageName": "ArtifactsMmoClient",
+  "targetFramework": "net9.0",
+  "library": "httpclient",
+  "useSystemTextJson": true,
+  "generateModelConstructor": false,
+  "optionalProjectFile": true,
+  "nullableReferenceTypes": true,
+  "modelPropertyNaming": "PascalCase",
+  "useDateTimeOffset": true,
+  "hideGenerationTimestamp": true,
+  "enumPropertyNaming": "PascalCase",
+  "enumMemberNaming": "original",
+  "useEnumMember": true,
+  "disallowAdditionalPropertiesIfNotPresent": false,
+  "generateAliasAsModel": false,
+  "resolveInlineEnums": true,
+  "inlineSchemaNameMapping": true,
+  "useOneOfDiscriminatorLookup": true
+}

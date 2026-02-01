@@ -1,0 +1,10 @@
+# ArtifactsMmoClient.Model.RecyclingResponseSchema
+
+## Properties
+
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Data** | [**RecyclingDataSchema**](RecyclingDataSchema.md) |  | 
+
+[[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
+

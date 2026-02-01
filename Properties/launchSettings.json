@@ -1,0 +1,27 @@
+{
+  "profiles": {
+    "Artifacts": {
+      "commandName": "Project"
+    },
+    "baz1": {
+      "commandName": "Project",
+      "commandLineArgs": "baz1 tasker"
+    },
+    "baz2": {
+      "commandName": "Project",
+      "commandLineArgs": "baz2 tasker"
+    },
+    "baz3": {
+      "commandName": "Project",
+      "commandLineArgs": "baz3 tasker"
+    },
+    "baz4": {
+      "commandName": "Project",
+      "commandLineArgs": "baz4 tasker"
+    },
+    "baz5": {
+      "commandName": "Project",
+      "commandLineArgs": "baz5 tasker"
+    }
+  }
+}
