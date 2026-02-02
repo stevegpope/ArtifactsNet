@@ -23,7 +23,7 @@ namespace Artifacts
             {
                 // Go to task master
                 Console.WriteLine($"Moving to task master");
-                await _character.Move(4, 13);
+                await _character.MoveTo(MapContentType.TasksMaster, code: "items");
 
                 await AcceptNewTask();
             }
@@ -33,27 +33,32 @@ namespace Artifacts
                 $"task type : {Utils.Details.TaskType}\n" +
                 $"task progress : {Utils.Details.TaskProgress}/{Utils.Details.TaskTotal}");
 
-            if (Utils.Details.TaskType == "items")
+            while (true)
             {
-                while (true)
+                // We switch task types on completion so we don't get left behind
+                if (Utils.Details.TaskType == "items")
                 {
-                    await HandleItemsTask(Utils.Details);
+                    await HandleItemsTask();
                     await _character.MoveTo(MapContentType.TasksMaster, "items");
                     await FinishTask();
+                    await _character.MoveTo(MapContentType.TasksMaster, "monsters");
                     await AcceptNewTask();
                 }
-            }
-            else if (Utils.Details.TaskType == "monsters")
-            {
-                // Go to bank and deposit all items
+                else if (Utils.Details.TaskType == "monsters")
+                {
+                    await HandleMonstersTask();
+                    await _character.MoveTo(MapContentType.TasksMaster, "monsters");
+                    await FinishTask();
+                    await _character.MoveTo(MapContentType.TasksMaster, "items");
+                    await AcceptNewTask();
+                }
+                else
+                {
+                    throw new NotImplementedException($"Task type {Utils.Details.TaskType} not implemented");
+                }
+
                 await _character.MoveTo(MapContentType.Bank);
                 await _character.DepositAllItems();
-
-                await HandleMonstersTask(Utils.Details);
-            }
-            else
-            {
-               throw new NotImplementedException($"Task type {Utils.Details.TaskType} not implemented");
             }
         }
 
@@ -90,8 +95,11 @@ namespace Artifacts
                 // Deposit all items except task items
                 await _character.DepositExcept(questItems);
 
-                // Get any quest items from bank
-                await _character.WithdrawItems(questItems);
+                foreach (var item in questItems)
+                {
+                    // Get any quest items from bank
+                    await _character.WithdrawItems(item);
+                }
             }
         }
 
@@ -116,18 +124,18 @@ namespace Artifacts
             return items;
         }
 
-        private async Task HandleItemsTask(CharacterSchema details)
+        private async Task HandleItemsTask()
         {
-            while (details.TaskProgress < details.TaskTotal)
+            while (Utils.Details.TaskProgress < Utils.Details.TaskTotal)
             {
                 await DepositNonQuestItemsAndGetMore();
 
-                var remaining = details.TaskTotal - details.TaskProgress;
+                var remaining = Utils.Details.TaskTotal - Utils.Details.TaskProgress;
 
                 // Do we already have the items in inventory?
-                foreach (var inventory in details.Inventory)
+                foreach (var inventory in Utils.Details.Inventory)
                 {
-                    if (inventory.Code == details.Task && inventory.Quantity > 0)
+                    if (inventory.Code == Utils.Details.Task && inventory.Quantity > 0)
                     {
                         await ExchangeItems(inventory.Code, inventory.Quantity, remaining);
                         continue;
@@ -135,22 +143,21 @@ namespace Artifacts
                 }
 
                 // Either craft the item, or go gather it
-                var item = await Items.Instance.GetItem(details.Task);
+                var item = await Items.Instance.GetItem(Utils.Details.Task);
                 if (item.Craft != null)
                 {
                     // Craft the item
                     Console.WriteLine($"Crafting item {item.Name}");
                     var crafted = await _character.CraftItems(item, remaining);
-                    await ExchangeItems(details.Task, crafted, remaining);
+                    await ExchangeItems(Utils.Details.Task, crafted, remaining);
                 }
                 else
                 {
                     // Go gather the item
                     Console.WriteLine($"Gathering item {item.Name}");
                     var gathered = await _character.GatherItems(item.Code, remaining);
-                    await ExchangeItems(details.Task, gathered, remaining);
+                    await ExchangeItems(Utils.Details.Task, gathered, remaining);
                 }
-
             }
         }
         private async Task ExchangeItems(string code, int quantity, int remaining)
@@ -161,9 +168,18 @@ namespace Artifacts
             await _character.TurnInItems(code, Math.Min(quantity, remaining));
         }
 
-        private async Task HandleMonstersTask(CharacterSchema details)
+        private async Task HandleMonstersTask()
         {
-            throw new NotImplementedException();
+            while (Utils.Details.TaskProgress < Utils.Details.TaskTotal)
+            {
+                var remaining = Utils.Details.TaskTotal - Utils.Details.TaskProgress;
+
+                var monster = Utils.Details.Task;
+
+                // TODO: gear up for the monster
+
+                await _character.FightLoop(remaining, monster);
+            }
         }
     }
 }

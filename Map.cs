@@ -1,6 +1,7 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using System.Threading.Tasks;
 
 namespace Artifacts
 {
@@ -44,6 +45,12 @@ namespace Artifacts
             var mapSchema = await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code);
             Console.WriteLine($"Retrieved map layer: {layer}, content type: {contentType}, code: {code ?? "N/A"}: {mapSchema.Total} results");
             return mapSchema;
+        }
+
+        internal async Task<MapSchema> GetMapPosition(int x, int y)
+        {
+            var mapResponseSchema = await _api.GetMapByPositionMapsLayerXYGetAsync(MapLayer.Overworld, x, y);
+            return mapResponseSchema.Data;
         }
     }
 }

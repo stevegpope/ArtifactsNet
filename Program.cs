@@ -1,4 +1,5 @@
 ﻿using ArtifactsMmoClient.Client;
+using ArtifactsMmoClient.Model;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -37,6 +38,8 @@ namespace Artifacts
             Map.Config(configuration, httpClient);
             Items.Config(configuration, httpClient);
             Resources.Config(configuration, httpClient);
+            Monsters.Config(configuration, httpClient);
+            Bank.Config(configuration, httpClient);
             Characters.Config(httpClient, configuration);
 
             var character = new Character(
@@ -46,6 +49,10 @@ namespace Artifacts
 
             // Load character details to verify it exists
             await character.Init();
+
+            // Start at the bank with no inventory
+            await character.MoveTo(MapContentType.Bank);
+            await character.DepositAllItems();
 
             var loop = new CharacterLoop(character, roles);
             await loop.RunAsync();

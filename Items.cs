@@ -1,6 +1,7 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using System.Threading.Tasks;
 
 namespace Artifacts
 {
@@ -9,6 +10,7 @@ namespace Artifacts
         private ItemsApi _api;
         private static Configuration _config;
         private static HttpClient _httpClient;
+        private static Dictionary<String, ItemSchema> _cache = null;
 
         internal static Items Instance => lazy.Value;
 
@@ -39,16 +41,169 @@ namespace Artifacts
             _api = new ItemsApi(httpClient, config);
         }
 
+        private async Task CacheItems()
+        {
+            if (_cache == null)
+            {
+                Console.WriteLine("Caching items");
+                _cache = new Dictionary<String, ItemSchema>();
+                var pageNum = 1;
+                while (true)
+                {
+                    var page = await _api.GetAllItemsItemsGetAsync(page: pageNum);
+                    foreach (var item in page.Data)
+                    {
+                        _cache[item.Code] = item;
+                    }
+
+                    pageNum++;
+                    if (pageNum == page.Pages)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
         internal async Task<ItemSchema> GetItem(string code)
         {
-            var item = await _api.GetItemItemsCodeGetAsync(code);
-            if (item != null)
+            await CacheItems();
+            if (_cache.ContainsKey(code))
+            { 
+                return _cache[code]; 
+            }
+
+            throw new Exception($"Item with code {code} not found.");
+        }
+
+        internal async Task<DataPageItemSchema> GetItems(CraftSkill skill, int minLevel, int maxLevel)
+        {
+            await CacheItems();
+
+            var items = await _api.GetAllItemsItemsGetAsync(minLevel: minLevel, maxLevel: maxLevel, craftSkill: skill);
+            if (items != null)
             {
-                return item.Data;
+                return items;
             }
             else
             {
-                throw new Exception($"Item with code {code} not found.");
+                throw new Exception($"Failed to find items");
+            }
+        }
+
+        internal bool IsBetterItem(ItemSchema bestItem, ItemSchema item, MonsterSchema monster)
+        {
+            // Optimization
+            if (bestItem != null && item != null && bestItem.Code == item.Code)
+            {
+                return false;
+            }
+
+            var item1Value = CalculateItemValue(bestItem, monster);
+            var item2Value = CalculateItemValue(item, monster);
+
+            return item2Value > item1Value;
+        }
+
+        private double CalculateItemValue(ItemSchema item, MonsterSchema monster)
+        {
+            if (item.Effects == null || item.Effects.Count == 0)
+            {
+                return 0;
+            }
+
+            var value = 0.0;
+
+            var estimatedRounds = monster.Level * 2;
+
+            foreach (var effect in item.Effects)
+            {
+                if (effect.Code == "hp") { value += effect.Value; }
+                if (effect.Code == "threat") { value += effect.Value; }
+                if (effect.Code == "dmg") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "dmg_earth") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "dmg_water") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "dmg_air") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "dmg_fire") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "attack_earth") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "attack_water") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "attack_air") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "attack_fire") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "critical_strike") { value += effect.Value * estimatedRounds; }
+            }
+
+            // Specific elements count twice
+            if (monster.AttackAir > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_air").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.AttackEarth > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_earth").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.AttackFire > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_fire").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.AttackWater > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_water").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.ResAir > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "attack_air").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.ResEarth > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "attack_earth").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.ResFire > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "attack_fire").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.ResWater > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "attack_water").Sum(e => e.Value) * estimatedRounds;
+            }
+
+            Console.WriteLine($"{item.Code} has value {value} against monster {monster.Code}");
+            return value;
+        }
+
+        internal bool ItemTypeMatchesSlot(string type, ItemSlot slotType)
+        {
+            switch (slotType)
+            {
+                case ItemSlot.Weapon:
+                    return "weapon" == type;
+                case ItemSlot.Boots:
+                    return "boots" == type;
+                case ItemSlot.Artifact1:
+                case ItemSlot.Artifact2:
+                case ItemSlot.Artifact3:
+                    return "artifact" == type;
+                case ItemSlot.Amulet:
+                    return "amulet" == type;
+                case ItemSlot.Bag:
+                    return "bag" == type;
+                case ItemSlot.BodyArmor:
+                    return "body_armor" == type;
+                case ItemSlot.Helmet:
+                    return "helmet" == type;
+                case ItemSlot.LegArmor:
+                    return "leg_armor" == type;
+                case ItemSlot.Ring1:
+                case ItemSlot.Ring2:
+                    return "ring" == type;
+                case ItemSlot.Rune:
+                    return "rune" == type;
+                case ItemSlot.Shield:
+                    return "shield" == type;
+                case ItemSlot.Utility1:
+                case ItemSlot.Utility2:
+                    return "utility" == type;
+                default:
+                    throw new NotImplementedException();
             }
         }
     }

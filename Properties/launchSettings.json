@@ -5,7 +5,7 @@
     },
     "baz1": {
       "commandName": "Project",
-      "commandLineArgs": "baz1 tasker"
+      "commandLineArgs": "baz1 fighter"
     },
     "baz2": {
       "commandName": "Project",
@@ -13,11 +13,11 @@
     },
     "baz3": {
       "commandName": "Project",
-      "commandLineArgs": "baz3 tasker"
+      "commandLineArgs": "baz3 fighter"
     },
     "baz4": {
       "commandName": "Project",
-      "commandLineArgs": "baz4 tasker"
+      "commandLineArgs": "baz4 crafter"
     },
     "baz5": {
       "commandName": "Project",

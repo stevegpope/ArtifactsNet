@@ -1,5 +1,6 @@
 ﻿using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -38,29 +39,40 @@ namespace Artifacts
             return Math.Abs(x1 - x2) + Math.Abs(y1 - y2);
         }
 
-        internal static async Task ApiCall(Func<Task<dynamic>> call)
+        internal static async Task<object> ApiCall(Func<Task<dynamic>> call)
         {
             try
             {
                 var result = await call();
-                if (TryGetProperty(result?.Data, "Cooldown", out object cooldown))
-
+                if (TryGetProperty(result, "Data", out object data))
                 {
-                    var cooldownschema = (CooldownSchema)cooldown;
-                    await Utils.Cooldown(cooldownschema.RemainingSeconds);
-                }
+                    if (TryGetProperty(result?.Data, "Cooldown", out object cooldown))
+                    {
+                        var cooldownschema = (CooldownSchema)cooldown;
+                        await Utils.Cooldown(cooldownschema.RemainingSeconds);
+                    }
 
-                if (TryGetProperty(result?.Data, "Character", out object character))
-                {
-                    Details = (CharacterSchema)character;
-                }
+                    if (TryGetProperty(result?.Data, "Character", out object character))
+                    {
+                        Details = (CharacterSchema)character;
+                    }
 
-                if (TryGetProperty(result?.Data, "Bank", out object bank))
-                {
-                    if (bank is BankSchema bankSchema) {
-                        Bank = bankSchema;
+                    if (TryGetProperty(result?.Data, "Characters", out object characters))
+                    {
+                        var list = (List<CharacterSchema>)characters;
+                        Details = list.First(x => x.Name == Details.Name);
+                    }
+
+                    if (TryGetProperty(result?.Data, "Bank", out object bank))
+                    {
+                        if (bank is BankSchema bankSchema)
+                        {
+                            Bank = bankSchema;
+                        }
                     }
                 }
+
+                return result;
             }
             catch (ApiException ex)
             {
@@ -73,8 +85,7 @@ namespace Artifacts
                     {
                         await Utils.Cooldown(seconds);
                     }
-                    await ApiCall(call);
-                    return;
+                    return await ApiCall(call);
                 }
 
                 Console.WriteLine($"API call failed: {ex.ErrorContent}, code  {ex.ErrorCode}");
@@ -132,6 +143,11 @@ namespace Artifacts
             }
 
             return closest;
+        }
+
+        internal static ItemSlot GetSlot(string slotType)
+        {
+            return JsonConvert.DeserializeObject<ItemSlot>($"\"{slotType}\"");
         }
     }
 }

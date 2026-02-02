@@ -2,8 +2,13 @@
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
 using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using static System.Reflection.Metadata.BlobBuilder;
 
 namespace Artifacts
 {
@@ -37,7 +42,20 @@ namespace Artifacts
             {
                 try
                 {
-                    var response = await _api.ActionMoveMyNameActionMovePostAsync(Name, new DestinationSchema(x, y));
+                    var destinationSchema = new DestinationSchema()
+                    {
+                        X = x,
+                        Y = y
+                    };
+
+                    // Hack for now
+                    if (x == 0 || y == 0)
+                    {
+                        var location = await Map.Instance.GetMapPosition(x, y);
+                        destinationSchema.MapId = location.MapId;
+                    }
+
+                    var response = await _api.ActionMoveMyNameActionMovePostAsync(Name, destinationSchema);
                     return response;
                 }
                 catch (ApiException ex)
@@ -59,8 +77,20 @@ namespace Artifacts
             var response = await Map.Instance.GetMapLayer(locationType, code);
             if (response.Data != null && response.Data.Any())
             {
-                MapSchema location = Utils.GetClosest(response.Data);
-                await Move(location.X, location.Y);
+                while(true)
+                {
+                    MapSchema location = Utils.GetClosest(response.Data);
+                    try
+                    {
+                        await Move(location.X, location.Y);
+                        break;
+                    }
+                    catch (ApiException ex)
+                    {
+                        Console.WriteLine($"Can't go to {location.X}, {location.Y}: {ex.ErrorContent}");
+                        response.Data.Remove(location);
+                    }
+                }
             }
             else
             {
@@ -97,9 +127,9 @@ namespace Artifacts
 
             // We'll make a few at a time
             // TODO: smarter calculation to maximize inventory usage
-            var batchSize = 50;
+            var batchSize = 5;
             var craftQuantity = Math.Min(remaining, batchSize);
-            for (var index = 0; index < batchSize; index++)
+            for (var index = 0; index < craftQuantity; index++)
             {
                 foreach (var component in item.Craft.Items)
                 {
@@ -124,7 +154,12 @@ namespace Artifacts
                 var gatherQuantity = gatherQuantities[component.Code];
                 if (gatherQuantity > 0)
                 {
-                    await GatherItems(component.Code, gatherQuantity);
+                    var gathered = await GatherItems(component.Code, gatherQuantity);
+                    if (gathered == 0)
+                    {
+                        Console.WriteLine($"We cannot gather {component.Code}!");
+                        return 0;
+                    }
                 }
             }
 
@@ -185,12 +220,50 @@ namespace Artifacts
 
         internal async Task<int> GatherItems(string code, int remaining)
         {
+            // Check the bank first
+            var bankItems = await Bank.Instance.GetItems();
+            var bankItemAmount = bankItems.Where(x => x.Code == code).Sum(x => x.Quantity);
+            if (bankItemAmount > 0)
+            {
+                Console.WriteLine($"Found {bankItemAmount} {code} in the bank, going to get them");
+                await MoveTo(MapContentType.Bank);
+                var quantity = Math.Min(remaining, bankItemAmount);
+                await WithdrawItems(code, quantity);
+                if (quantity == remaining)
+                {
+                    // Found all we need in the bank
+                    return quantity;
+                }
+            }
+
+            var item = await Items.Instance.GetItem(code);
+            if (item.Craft != null)
+            {
+                Console.WriteLine($"Cannot gather {code}, need to craft it");
+                return await CraftItems(item, remaining);
+            }
+
+            var monsters = Monsters.Instance.GetMonsters(maxLevel: 100, dropCode: item.Code);
+            if (monsters.Data.Any())
+            {
+                var monster = monsters.Data.MinBy(x => x.Level);
+                Console.WriteLine($"Need to fight for {code}, chasing {monster}");
+                if (monster.Level > Utils.Details.Level)
+                {
+                    Console.WriteLine("We can't beat this monster, bailing");
+                    return 0;
+                }
+
+                return await FightDrops(monster.Code, code, remaining);
+            }
+
             Console.WriteLine($"Gathering {remaining} of {code} for character {Name}");
 
             var resourceCode = await Resources.Instance.GetResourceDrop(code);
             if (resourceCode == null)
             {
-                throw new Exception($"No resource found with drop {code}");
+                throw new Exception($"No resource found with drop {code}, we cannot craft this");
+                return 0;
             }
 
             await MoveClosest(MapContentType.Resource, resourceCode);
@@ -214,9 +287,12 @@ namespace Artifacts
                 {
                     if (ex.ErrorCode == 497)
                     {
-                        Console.WriteLine($"Inventory full for character {Name}, gathered {gathered} of {code}");
-                        break;
+                        Console.WriteLine("Inventory full, be right back");
+                        await MoveTo(MapContentType.Bank);
+                        await DepositAllItems();
+                        await WithdrawItems(code);
                     }
+
                     throw;
                 }
             }
@@ -224,24 +300,90 @@ namespace Artifacts
             return gathered;
         }
 
+        private async Task<int> FightDrops(string monster, string code, int remaining)
+        {
+            await GearUp(monster);
+
+            var lostLastFight = 0;
+
+            var drops = 0;
+            while (drops < remaining)
+            {
+                // Assume we are not at the monster
+                await MoveTo(MapContentType.Monster, code: monster);
+
+                // If we are healthy enough fight right away
+                var needsRest = false;
+                if (lostLastFight == 0 && Utils.Details.Hp < Utils.Details.MaxXp * .75)
+                {
+                    needsRest = true;
+                }
+                else if (Utils.Details.Hp < lostLastFight)
+                {
+                    needsRest |= true;
+                }
+
+                if (needsRest)
+                {
+                    await Rest();
+                }
+
+                try
+                {
+                    var hp = Utils.Details.Hp;
+                    var result = await Fight();
+                    lostLastFight = hp - Utils.Details.Hp;
+                    Console.WriteLine($"Fight results: {result.Data.Fight.ToString()}");
+                }
+                catch (ApiException ex)
+                {
+                    if (ex.ErrorCode == 497)
+                    {
+                        Console.WriteLine("Inventory full, cannot fight");
+                        break;
+                    }
+
+                    Console.WriteLine($"Fight error: {ex.ErrorContent}");
+                    throw;
+                }
+            }
+
+            return drops;
+        }
+
         internal async Task DepositAllItems()
         {
             Console.WriteLine($"Depositing all items for character {Name}");
             await DepositGold();
 
-            await Utils.ApiCall(async () =>
+            foreach (var item in Utils.Details.Inventory)
             {
-                var items = new List<SimpleItemSchema>();
-                foreach (var item in Utils.Details.Inventory)
+                if (string.IsNullOrEmpty(item.Code))
                 {
-                    if (!string.IsNullOrEmpty(item.Code))
-                    {
-                        items.Add(new SimpleItemSchema(item.Code, item.Quantity));
-                    }
+                    continue;
                 }
-                var response = await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
-                return response;
-            });
+
+                await Utils.ApiCall(async () =>
+                {
+                    var items = new List<SimpleItemSchema>();
+                    items.Add(new SimpleItemSchema(item.Code, item.Quantity));
+                    try
+                    {
+                        return await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
+                    }
+                    catch (ApiException ex)
+                    {
+                        if (ex.ErrorCode == 478)
+                        {
+                            // We don't have enough of this item??
+                            return null;
+                        }
+
+                        throw;
+                    }
+                });
+            }
+
         }
 
         internal async Task DepositExcept(List<string> excludeCodes)
@@ -286,8 +428,335 @@ namespace Artifacts
             });
         }
 
-        internal async Task WithdrawItems(List<string> questItems)
+        internal async Task<int> WithdrawItems(string code, int quantity = 0)
         {
+            var bankItems = await Bank.Instance.GetItems();
+
+            var bankItem = bankItems.FirstOrDefault(b => b.Code == code);
+            if (bankItem == null)
+            {
+                return 0;
+            }
+
+            var withdrawQuantity = quantity;
+            if (withdrawQuantity == 0)
+            {
+                withdrawQuantity = Math.Min(GetFreeInventorySpace(), bankItem.Quantity);
+            }
+            else
+            {
+                withdrawQuantity = Math.Min(quantity, bankItem.Quantity);
+            }
+
+            Console.WriteLine($"Try to withdraw {withdrawQuantity} of {code}");
+
+            try
+            {
+                await Utils.ApiCall(async () =>
+                {
+                    var items = new List<SimpleItemSchema> { new SimpleItemSchema(code, withdrawQuantity) };
+                    return await _api.ActionWithdrawBankItemMyNameActionBankWithdrawItemPostAsync(Name, items);
+                });
+            }
+            catch (ApiException ex)
+            {
+                Console.WriteLine($"Could not withdraw: {ex.ErrorContent}");
+                return 0;
+            }
+
+            return withdrawQuantity;
+        }
+        private int GetFreeInventorySpace()
+        {
+            var amount = Utils.Details.InventoryMaxItems;
+            foreach(var item in Utils.Details.Inventory)
+            {
+                amount -= item.Quantity;
+            }
+
+            return amount;
+        }
+
+        internal async Task FightLoop(int total, string monster)
+        {
+            var monstersKilled = 0;
+            var lostLastFight = 0;
+
+            await GearUp(monster);
+
+            while(monstersKilled < total)
+            {
+                // Assume we are not at the monster
+                await MoveTo(MapContentType.Monster, code: monster);
+
+                // If we are healthy enough fight right away
+                var needsRest = false;
+                if (lostLastFight == 0 && Utils.Details.Hp < Utils.Details.MaxXp * .75)
+                {
+                    needsRest = true;
+                }
+                else if (Utils.Details.Hp < lostLastFight)
+                {
+                    needsRest |= true;
+                }
+
+                if (needsRest)
+                {
+                    await Rest();
+                }
+
+                try
+                {
+                    var hp = Utils.Details.Hp;
+                    var result = await Fight();
+                    lostLastFight = hp - Utils.Details.Hp;
+                    Console.WriteLine($"Fight results: {result.Data.Fight.ToString()}");
+                }
+                catch (ApiException ex)
+                {
+                    Console.WriteLine($"Fight error: {ex.ErrorContent}");
+                    if (ex.ErrorCode == 497)
+                    {
+                        Console.WriteLine("Inventory full, be right back");
+                        await MoveTo(MapContentType.Bank);
+                        await DepositAllItems();
+                    }
+                }
+            }
+        }
+
+        private async Task Rest()
+        {
+            Console.WriteLine("Rest");
+            await Utils.ApiCall(async () =>
+            {
+                return await _api.ActionRestMyNameActionRestPostAsync(Name);
+            });
+        }
+
+        private async Task<CharacterFightResponseSchema> Fight()
+        {
+            Console.WriteLine("Fight!!");
+
+            var result = await Utils.ApiCall(async () =>
+            {
+                return await _api.ActionFightMyNameActionFightPostAsync(Name);
+            });
+
+            return (CharacterFightResponseSchema)result;
+        }
+
+        private async Task GearUp(string monsterCode)
+        {
+            // Compare our equipment to the equiment in the bank currently. We can't do anything
+            // about bank equipment being taken before we get to it, so we will check for that.
+
+            var monster = await Monsters.Instance.GetMonster(monsterCode);
+            
+            Console.WriteLine("Check inventory for better items");
+
+            await EquipBestInInventory(Utils.Details.WeaponSlot, ItemSlot.Weapon, monster);
+            await EquipBestInInventory(Utils.Details.ShieldSlot, ItemSlot.Shield, monster);
+            await EquipBestInInventory(Utils.Details.HelmetSlot, ItemSlot.Helmet, monster);
+            await EquipBestInInventory(Utils.Details.BodyArmorSlot, ItemSlot.BodyArmor, monster);
+            await EquipBestInInventory(Utils.Details.LegArmorSlot, ItemSlot.LegArmor, monster);
+            await EquipBestInInventory(Utils.Details.BootsSlot, ItemSlot.Boots, monster);
+            await EquipBestInInventory(Utils.Details.Ring1Slot, ItemSlot.Ring1, monster);
+            await EquipBestInInventory(Utils.Details.AmuletSlot, ItemSlot.Amulet, monster);
+            await EquipBestInInventory(Utils.Details.Artifact1Slot, ItemSlot.Artifact1, monster);
+            await EquipBestInInventory(Utils.Details.Artifact2Slot, ItemSlot.Artifact2, monster);
+            await EquipBestInInventory(Utils.Details.Artifact3Slot, ItemSlot.Artifact3, monster);
+            await EquipBestInInventory(Utils.Details.Utility1Slot, ItemSlot.Utility1, monster);
+            await EquipBestInInventory(Utils.Details.Utility2Slot, ItemSlot.Utility2, monster);
+            await EquipBestInInventory(Utils.Details.BagSlot, ItemSlot.Bag, monster);
+            await EquipBestInInventory(Utils.Details.RuneSlot, ItemSlot.Rune, monster);
+            
+            Console.WriteLine("Check bank for better items");
+            
+            var bankItems = await Bank.Instance.GetItems();
+            var deposit = await EquipBestInBank(Utils.Details.WeaponSlot, ItemSlot.Weapon, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.ShieldSlot, ItemSlot.Shield, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.HelmetSlot, ItemSlot.Helmet, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.BodyArmorSlot, ItemSlot.BodyArmor, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.LegArmorSlot, ItemSlot.LegArmor, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.BootsSlot, ItemSlot.Boots, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.Ring1Slot, ItemSlot.Ring1, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.AmuletSlot, ItemSlot.Amulet, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.Artifact1Slot, ItemSlot.Artifact1, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.Artifact2Slot, ItemSlot.Artifact2, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.Artifact3Slot, ItemSlot.Artifact3, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.Utility1Slot, ItemSlot.Utility1, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.Utility2Slot, ItemSlot.Utility2, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.BagSlot, ItemSlot.Bag, monster, bankItems);
+            deposit |= await EquipBestInBank(Utils.Details.RuneSlot, ItemSlot.Rune, monster, bankItems);
+            if (deposit)
+            {
+                await DepositAllItems();
+            }
+        }
+
+        private async Task<bool> EquipBestInBank(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems)
+        {
+            ItemSchema bestItem = await GetBestItemFromBank(currentEquipped, slotType, monster, bankItems);
+
+            if (bestItem != null && bestItem.Code != currentEquipped)
+            {
+                await MoveTo(MapContentType.Bank);
+                int withdrawn = 0;
+                if (slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2)
+                {
+                    // Special case for potions
+                    withdrawn = await WithdrawItems(bestItem.Code);
+                }
+                else 
+                {
+                    withdrawn = await WithdrawItems(bestItem.Code, 1);
+                }
+
+                if (withdrawn > 0)
+                {
+                    if (!string.IsNullOrEmpty(currentEquipped))
+                    {
+                        await Unequip(slotType);
+                    }
+
+                    await Equip(bestItem.Code, slotType);
+                }
+                else
+                {
+                    Console.WriteLine($"Cannot find {bestItem.Code} in bank");
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private async Task<ItemSchema> GetBestItemFromBank(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems)
+        {
+            ItemSchema bestItem = null;
+            if (!string.IsNullOrEmpty(currentEquipped))
+            {
+                bestItem = await Items.Instance.GetItem(currentEquipped);
+            }
+
+            foreach (var bankItem in bankItems)
+            {
+                var item = await Items.Instance.GetItem(bankItem.Code);
+                if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
+                {
+                    if (bestItem == null)
+                    {
+                        bestItem = item;
+                    }
+                    else if (Items.Instance.IsBetterItem(bestItem, item, monster))
+                    {
+                        bestItem = item;
+                    }
+                }
+            }
+
+            Console.WriteLine($"Best item in bank for {slotType} is {bestItem?.Code}");
+            return bestItem;
+        }
+
+        private async Task EquipBestInInventory(string currentEquipped, ItemSlot slotType, MonsterSchema monster)
+        {
+            ItemSchema bestItem = await GetBestItemFromInventory(currentEquipped, slotType, monster);
+
+            if (bestItem != null && bestItem.Code != currentEquipped)
+            {
+                if (!string.IsNullOrEmpty(currentEquipped))
+                {
+                    await Unequip(slotType);
+                }
+
+                await Equip(bestItem.Code, slotType);
+            }
+        }
+
+        private static async Task<ItemSchema> GetBestItemFromInventory(string currentEquipped, ItemSlot slotType, MonsterSchema monster)
+        {
+            ItemSchema bestItem = null;
+            if (!string.IsNullOrEmpty(currentEquipped))
+            {
+                bestItem = await Items.Instance.GetItem(currentEquipped);
+            }
+
+            foreach (var inventoryItem in Utils.Details.Inventory)
+            {
+                if (string.IsNullOrEmpty(inventoryItem.Code))
+                {
+                    continue;
+                }
+
+                var item = await Items.Instance.GetItem(inventoryItem.Code);
+                if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
+                {
+                    if (bestItem == null)
+                    {
+                        bestItem = item;
+                    }
+                    else if (Items.Instance.IsBetterItem(bestItem, item, monster))
+                    {
+                        bestItem = item;
+                    }
+                }
+            }
+
+            Console.WriteLine($"Best item in inventory for {slotType} is {bestItem?.Code}");
+            return bestItem;
+        }
+
+        private async Task Unequip(ItemSlot slotType)
+        {
+            await Utils.ApiCall(async () =>
+            {
+                try
+                {
+                    var quantity = 1;
+                    if (slotType == ItemSlot.Utility1)
+                    {
+                        quantity = Utils.Details.Utility1SlotQuantity;
+                    }
+                    else if (slotType == ItemSlot.Utility2)
+                    {
+                        quantity = Utils.Details.Utility2SlotQuantity;
+                    }
+
+                    Console.WriteLine($"Unquip {quantity} from {slotType}");
+                    return _api.ActionUnequipItemMyNameActionUnequipPostAsync(Name, new UnequipSchema(slotType, quantity));
+                }
+                catch (ApiException ex)
+                {
+                    Console.WriteLine($"Unequip error: {ex.ErrorContent}");
+                    throw;
+                }
+        });
+        }
+
+        private async Task Equip(string code, ItemSlot slotType, int quantity = 0)
+        {
+            await Utils.ApiCall(async () =>
+            {
+                try
+                {
+                    var quantity = 1;
+                    if (slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2)
+                    {
+                        quantity = Utils.Details.Inventory.Where(x => x.Code == code).Sum(x => x.Quantity);
+                    }
+
+                    Console.WriteLine($"Equip {quantity} {code} in {slotType}");
+                    return _api.ActionEquipItemMyNameActionEquipPostAsync(Name, new EquipSchema(code, slotType, quantity));
+                }
+                catch(ApiException ex)
+                {
+                    Console.WriteLine($"Equip error: {ex.ErrorContent}");
+                    throw;
+                }
+            });
         }
     }
 }
