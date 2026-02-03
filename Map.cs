@@ -43,7 +43,6 @@ namespace Artifacts
         internal async Task<DataPageMapSchema> GetMapLayer(MapContentType contentType, string code = null, MapLayer layer = MapLayer.Overworld)
         {
             var mapSchema = await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code);
-            Console.WriteLine($"Retrieved map layer: {layer}, content type: {contentType}, code: {code ?? "N/A"}: {mapSchema.Total} results");
             return mapSchema;
         }
 

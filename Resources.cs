@@ -9,6 +9,7 @@ namespace Artifacts
         private ResourcesApi _api;
         private static Configuration _config;
         private static HttpClient _httpClient;
+        private static Dictionary<string, ResourceSchema> _cache = null;
 
         internal static Resources Instance => lazy.Value;
 
@@ -39,6 +40,30 @@ namespace Artifacts
             _api = new ResourcesApi(httpClient, config);
         }
 
+        private async Task CacheItems()
+        {
+            if (_cache == null)
+            {
+                Console.WriteLine("Caching resources");
+                _cache = new Dictionary<string, ResourceSchema>();
+                var pageNum = 1;
+                while (true)
+                {
+                    var page = await _api.GetAllResourcesResourcesGetAsync();
+                    foreach (var item in page.Data)
+                    {
+                        _cache[item.Code] = item;
+                    }
+
+                    pageNum++;
+                    if (pageNum >= page.Pages)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
         internal async Task<string> GetResourceDrop(string drop)
         {
             string resourceCode = null;
@@ -54,6 +79,24 @@ namespace Artifacts
             });
 
             return resourceCode;
+        }
+
+        internal async Task<string> GetResourceSkill(ItemSchema item)
+        {
+            await CacheItems();
+            foreach(var cacheItem in _cache.Values)
+            {
+                if (item.Code ==  cacheItem.Code)
+                {
+                    return cacheItem.Skill.ToString().ToLower();
+                }
+                else if (cacheItem.Drops.Any(drop => drop.Code == item.Code))
+                {
+                    return cacheItem.Skill.ToString().ToLower();
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -7,7 +7,7 @@ namespace Artifacts
     internal class FighterLoop
     {
         private Character _character;
-        private Random _random = new Random();
+        private Random _random = Random.Shared;
 
         public FighterLoop(Character character)
         {
@@ -30,7 +30,7 @@ namespace Artifacts
                 }
 
                 // Pick a random one
-                var monster = candidates.Data.ElementAt(_random.Next(candidates.Data.Count - 1));
+                var monster = candidates.Data.ElementAt(_random.Next(candidates.Data.Count));
 
                 Console.WriteLine($"Fighter chose monster {monster}");
 

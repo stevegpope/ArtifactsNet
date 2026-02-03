@@ -10,7 +10,7 @@ namespace Artifacts
         private ItemsApi _api;
         private static Configuration _config;
         private static HttpClient _httpClient;
-        private static Dictionary<String, ItemSchema> _cache = null;
+        private static Dictionary<string, ItemSchema> _cache = null;
 
         internal static Items Instance => lazy.Value;
 
@@ -46,7 +46,7 @@ namespace Artifacts
             if (_cache == null)
             {
                 Console.WriteLine("Caching items");
-                _cache = new Dictionary<String, ItemSchema>();
+                _cache = new Dictionary<string, ItemSchema>();
                 var pageNum = 1;
                 while (true)
                 {
@@ -74,6 +74,12 @@ namespace Artifacts
             }
 
             throw new Exception($"Item with code {code} not found.");
+        }
+
+        internal async Task<Dictionary<string, ItemSchema>> GetAllItems()
+        {
+            await CacheItems();
+            return _cache;
         }
 
         internal async Task<DataPageItemSchema> GetItems(CraftSkill skill, int minLevel, int maxLevel)
@@ -130,6 +136,8 @@ namespace Artifacts
                 if (effect.Code == "attack_air") { value += effect.Value * estimatedRounds; }
                 if (effect.Code == "attack_fire") { value += effect.Value * estimatedRounds; }
                 if (effect.Code == "critical_strike") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "heal") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "restore") { value += effect.Value * estimatedRounds; }
             }
 
             // Specific elements count twice
@@ -205,6 +213,42 @@ namespace Artifacts
                 default:
                     throw new NotImplementedException();
             }
+        }
+
+        internal bool IsBetterItemSkill(ItemSchema bestItem, ItemSchema item, string skill)
+        {
+            // Optimization
+            if (bestItem != null && item != null && bestItem.Code == item.Code)
+            {
+                return false;
+            }
+
+            var item1Value = CalculateItemValueSkill(bestItem, skill);
+            var item2Value = CalculateItemValueSkill(item, skill);
+
+            return item2Value > item1Value;
+        }
+
+        internal double CalculateItemValueSkill(ItemSchema item, string skill)
+        {
+            if (item == null)
+            {
+                return 0;
+            }
+
+            if (item.Effects == null || item.Effects.Count == 0)
+            {
+                return 0;
+            }
+
+            var value = 0.0;
+            foreach (var effect in item.Effects)
+            {
+                // These effects have negative values!
+                if (effect.Code == skill) { value -= effect.Value; }
+            }
+
+            return value;
         }
     }
 }

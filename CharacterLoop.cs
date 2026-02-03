@@ -36,8 +36,14 @@ namespace Artifacts
                     await loop.RunAsync();
                     return;
                 }
+                else if (_roles.Contains("gatherer"))
+                {
+                    var loop = new GatherLoop(_character);
+                    await loop.RunAsync();
+                    return;
+                }
 
-                    throw new NotImplementedException("Other roles are not implemented yet.");
+                throw new NotImplementedException("Other roles are not implemented yet.");
             }
         }
     }

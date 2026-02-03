@@ -128,12 +128,6 @@ namespace Artifacts
 
             foreach (var map in data)
             {
-                if (closest == null)
-                {
-                    closest = map;
-                    continue;
-                }
-
                 var currentDistance = CalculateManhattanDistance(Details.X, Details.Y, map.X, map.Y);
                 if (currentDistance < minDistance)
                 {
