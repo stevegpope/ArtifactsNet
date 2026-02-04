@@ -87,9 +87,62 @@ namespace Artifacts
                     }
                     return await ApiCall(call);
                 }
+                else if (ex.ErrorCode == 486)
+                {
+                    Console.WriteLine($"An action is already in progress. Try again??");
+                    return await ApiCall(call);
+                }
 
                 Console.WriteLine($"API call failed: {ex.ErrorContent}, code  {ex.ErrorCode}");
                 throw;
+            }
+        }
+
+        internal static int GetSkillLevel(string skill)
+        {
+            switch (skill)
+            {
+                case "weaponcrafting":
+                    return Utils.Details.WeaponcraftingLevel;
+                case "gearcrafting":
+                    return Utils.Details.GearcraftingLevel;
+                case "jewelrycrafting":
+                    return Utils.Details.JewelrycraftingLevel;
+                case "cooking":
+                    return Utils.Details.CookingLevel;
+                case "alchemy":
+                    return Utils.Details.AlchemyLevel;
+                case "woodcutting":
+                    return Utils.Details.WoodcuttingLevel;
+                case "mining":
+                    return Utils.Details.MiningLevel;
+                case "fishing":
+                    return Utils.Details.FishingLevel;
+                default:
+                    throw new Exception($"Unexpected skill {skill}");
+            }
+        }
+
+        internal static CraftSkill GetSkillCraft(string skill)
+        {
+            switch (skill)
+            {
+                case "weaponcrafting":
+                    return CraftSkill.Weaponcrafting;
+                case "gearcrafting":
+                    return CraftSkill.Gearcrafting;
+                case "jewelrycrafting":
+                    return CraftSkill.Jewelrycrafting;
+                case "cooking":
+                    return CraftSkill.Cooking;
+                case "alchemy":
+                    return CraftSkill.Alchemy;
+                case "woodcutting":
+                    return CraftSkill.Woodcutting;
+                case "mining":
+                    return CraftSkill.Mining;
+                default:
+                    throw new Exception($"Unexpected skill {skill}");
             }
         }
 

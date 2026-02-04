@@ -111,10 +111,16 @@ namespace Artifacts
             return item2Value > item1Value;
         }
 
-        private double CalculateItemValue(ItemSchema item, MonsterSchema monster)
+        internal double CalculateItemValue(ItemSchema item, MonsterSchema monster)
         {
             if (item.Effects == null || item.Effects.Count == 0)
             {
+                return 0;
+            }
+
+            if (item.Level > Utils.Details.Level)
+            {
+                // Too high level for us
                 return 0;
             }
 
@@ -125,6 +131,7 @@ namespace Artifacts
             foreach (var effect in item.Effects)
             {
                 if (effect.Code == "hp") { value += effect.Value; }
+                if (effect.Code == "boost_hp") { value += effect.Value; }
                 if (effect.Code == "threat") { value += effect.Value; }
                 if (effect.Code == "dmg") { value += effect.Value * estimatedRounds; }
                 if (effect.Code == "dmg_earth") { value += effect.Value * estimatedRounds; }
@@ -138,6 +145,10 @@ namespace Artifacts
                 if (effect.Code == "critical_strike") { value += effect.Value * estimatedRounds; }
                 if (effect.Code == "heal") { value += effect.Value * estimatedRounds; }
                 if (effect.Code == "restore") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "boost_dmg_earth") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "boost_dmg_water") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "boost_dmg_fire") { value += effect.Value * estimatedRounds; }
+                if (effect.Code == "boost_dmg_air") { value += effect.Value * estimatedRounds; }
             }
 
             // Specific elements count twice
@@ -160,18 +171,22 @@ namespace Artifacts
             if (monster.ResAir > 0)
             {
                 value += item.Effects.Where(e => e.Code == "attack_air").Sum(e => e.Value) * estimatedRounds;
+                value += item.Effects.Where(e => e.Code == "boost_dmg_air").Sum(e => e.Value) * estimatedRounds;
             }
             if (monster.ResEarth > 0)
             {
                 value += item.Effects.Where(e => e.Code == "attack_earth").Sum(e => e.Value) * estimatedRounds;
+                value += item.Effects.Where(e => e.Code == "boost_dmg_earth").Sum(e => e.Value) * estimatedRounds;
             }
             if (monster.ResFire > 0)
             {
                 value += item.Effects.Where(e => e.Code == "attack_fire").Sum(e => e.Value) * estimatedRounds;
+                value += item.Effects.Where(e => e.Code == "boost_dmg_fire").Sum(e => e.Value) * estimatedRounds;
             }
             if (monster.ResWater > 0)
             {
                 value += item.Effects.Where(e => e.Code == "attack_water").Sum(e => e.Value) * estimatedRounds;
+                value += item.Effects.Where(e => e.Code == "boost_dmg_water").Sum(e => e.Value) * estimatedRounds;
             }
 
             Console.WriteLine($"{item.Code} has value {value} against monster {monster.Code}");

@@ -33,33 +33,26 @@ namespace Artifacts
                 };
 
                 var skill = skills.ElementAt(_random.Next(skills.Length));
-                Console.WriteLine($"Crafter chose skill {skill}");
 
-                int level = 0;
                 int craftAmount = 1;
-                CraftSkill craftSkill;
                 switch (skill)
                 {
                     case "weaponcrafting":
-                        level = Utils.Details.WeaponcraftingLevel;
-                        craftSkill = CraftSkill.Weaponcrafting;
                         break;
                     case "gearcrafting":
-                        level = Utils.Details.GearcraftingLevel;
-                        craftSkill = CraftSkill.Gearcrafting;
                         break;
                     case "jewelrycrafting":
-                        level = Utils.Details.JewelrycraftingLevel;
-                        craftSkill = CraftSkill.Jewelrycrafting;
                         break;
                     case "alchemy":
-                        level = Utils.Details.AlchemyLevel;
-                        craftSkill = CraftSkill.Alchemy;
                         craftAmount = 8;
                         break;
                     case "cooking":
-                        level = Utils.Details.CookingLevel;
-                        craftSkill = CraftSkill.Cooking;
+                        craftAmount = 8;
+                        break;
+                    case "mining":
+                        craftAmount = 8;
+                        break;
+                    case "woodcutting":
                         craftAmount = 8;
                         break;
                     default:
@@ -67,18 +60,23 @@ namespace Artifacts
 
                 }
 
+                var craftSkill = Utils.GetSkillCraft(skill);
+                var level = Utils.GetSkillLevel(skill);
+                Console.WriteLine($"Crafter chose skill {skill} at level {level} with {craftSkill}");
+
                 // Choose the highest level thing we can craft
                 var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
+                Console.WriteLine($"{items.Data.Count} potential things to craft");
                 ItemSchema item = null;
 
                 var bankItems = await Bank.Instance.GetItems();
 
                 var total = 0;
                 ItemSchema itemCrafted = null;
-                for (int targetLevel = level; targetLevel >= 0; targetLevel--)
+                for (int targetLevel = level; targetLevel > 0; targetLevel--)
                 {
-                    // For now, do not build things that we have too many
-                    var itemsAtLevel = items.Data.Where(x => x.Level == targetLevel && !bankItems.Any(item => item.Code == x.Code && item.Quantity >= 50));
+                    var itemsAtLevel = items.Data.Where(x => x.Level == targetLevel);
+                    Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
                     var itemsList = new List<ItemSchema>(itemsAtLevel);
                     while (itemsList.Any())
                     {
@@ -87,19 +85,21 @@ namespace Artifacts
                         if (total == 0)
                         {
                             itemsList.Remove(item);
+                            continue;
                         }
                         itemCrafted = item;
+                        break;
+                    }
+
+                    if (total > 0)
+                    {
                         break;
                     }
                 }
 
                 if (total == 0)
                 {
-                    Console.WriteLine($"Nothing we can craft for skill {skill}");
-
-                    // In case we loop
-                    Thread.Sleep(5000);
-                    continue;
+                    throw new Exception($"Nothing we can craft for skill {skill}");
                 }
 
                 // Go deposit the results in the bank
@@ -119,7 +119,7 @@ namespace Artifacts
             var bankItems = await Bank.Instance.GetItems();
             foreach (var bankItem in bankItems)
             {
-                if (bankItem.Quantity > TooMany)
+                if (bankItem.Quantity > TooMany * 2)
                 {
                     var item = await Items.Instance.GetItem(bankItem.Code);
 
@@ -135,7 +135,17 @@ namespace Artifacts
                         {
                             try
                             {
+                                // Go to relevant workshop
+                                await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
+
                                 await _character.Recycle(item.Code, amount);
+
+                                // Bank to bank for deposit
+                                await _character.MoveTo(MapContentType.Bank);
+                                await _character.DepositAllItems();
+
+                                // Start again to recheck state of the bank etc
+                                await Recycle();
                             }
                             catch (ApiException ex)
                             {

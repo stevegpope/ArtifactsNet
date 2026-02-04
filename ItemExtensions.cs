@@ -17,15 +17,6 @@ namespace Artifacts
                 builder.AppendLine($"{component.Code}: {component.Quantity}");
             }
             Console.WriteLine(builder);
-
-            Console.WriteLine("Relevant Inventory:");
-            foreach (var inventoryItem in Utils.Details.Inventory)
-            {
-                if (item.Craft.Items.Any(x => x.Code == inventoryItem.Code))
-                {
-                    Console.WriteLine($"{inventoryItem.Code}: {inventoryItem.Quantity}");
-                }
-            }
         }
     }
 }

@@ -5,7 +5,7 @@
     },
     "baz1": {
       "commandName": "Project",
-      "commandLineArgs": "baz1 gatherer"
+      "commandLineArgs": "baz1 fighter"
     },
     "baz2": {
       "commandName": "Project",
