@@ -31,7 +31,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="robocopy &quot;c:\code\Artifacts\bin\Debug\net10.0&quot; &quot;c:\t&quot; /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NC /NS &gt;nul&#xD;&#xA;exit /b 0" />
+    <Exec Command="robocopy &quot;c:\code\Artifacts\bin\Debug\net10.0&quot; &quot;c:\t\baz1&quot; /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NC /NS &gt;nul&#xD;&#xA;robocopy &quot;c:\code\Artifacts\bin\Debug\net10.0&quot; &quot;c:\t\baz2&quot; /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NC /NS &gt;nul&#xD;&#xA;robocopy &quot;c:\code\Artifacts\bin\Debug\net10.0&quot; &quot;c:\t\baz3&quot; /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NC /NS &gt;nul&#xD;&#xA;robocopy &quot;c:\code\Artifacts\bin\Debug\net10.0&quot; &quot;c:\t\baz4&quot; /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NC /NS &gt;nul&#xD;&#xA;robocopy &quot;c:\code\Artifacts\bin\Debug\net10.0&quot; &quot;c:\t\baz5&quot; /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NC /NS &gt;nul&#xD;&#xA;exit /b 0" />
   </Target>
 
 </Project>

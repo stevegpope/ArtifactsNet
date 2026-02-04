@@ -948,6 +948,11 @@ namespace Artifacts
                     // Special case: we cannot have the same item in both utility slots
                     continue;
                 }
+                if (slotType == ItemSlot.Utility2 && bankItem.Code == Utils.Details.Utility1Slot)
+                {
+                    // Special case: we cannot have the same item in both utility slots
+                    continue;
+                }
 
 
                 var item = await Items.Instance.GetItem(bankItem.Code);
