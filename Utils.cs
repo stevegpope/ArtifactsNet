@@ -26,12 +26,22 @@ namespace Artifacts
                     PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
                     WriteIndented = true
                 });
-        }   
+        }
 
         internal static async Task Cooldown(int seconds)
         {
             Console.WriteLine($"Waiting for cooldown: {seconds} seconds");
             await Task.Delay(seconds * 1000);
+        }
+
+        internal static async Task Cooldown(DateTimeOffset dateTime)
+        {
+            var remaining = dateTime - DateTimeOffset.UtcNow;
+            var seconds = Math.Max(0, remaining.TotalSeconds);
+
+            Console.WriteLine($"Waiting for cooldown: {seconds:F2} seconds");
+
+            await Task.Delay(TimeSpan.FromSeconds(seconds));
         }
 
         internal static double CalculateManhattanDistance(double x1, double y1, double x2, double y2)
@@ -49,7 +59,7 @@ namespace Artifacts
                     if (TryGetProperty(result?.Data, "Cooldown", out object cooldown))
                     {
                         var cooldownschema = (CooldownSchema)cooldown;
-                        await Utils.Cooldown(cooldownschema.RemainingSeconds);
+                        await Utils.Cooldown(cooldownschema.TotalSeconds);
                     }
 
                     if (TryGetProperty(result?.Data, "Character", out object character))

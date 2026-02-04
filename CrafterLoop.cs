@@ -2,7 +2,9 @@
 using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using Polly.Caching;
 using System.Net.Security;
+using Xunit.Abstractions;
 
 namespace Artifacts
 {
@@ -49,12 +51,6 @@ namespace Artifacts
                     case "cooking":
                         craftAmount = 8;
                         break;
-                    case "mining":
-                        craftAmount = 8;
-                        break;
-                    case "woodcutting":
-                        craftAmount = 8;
-                        break;
                     default:
                         throw new Exception($"Unexpected skill {skill}");
 
@@ -67,35 +63,10 @@ namespace Artifacts
                 // Choose the highest level thing we can craft
                 var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
                 Console.WriteLine($"{items.Data.Count} potential things to craft");
-                ItemSchema item = null;
 
                 var bankItems = await Bank.Instance.GetItems();
 
-                var total = 0;
-                ItemSchema itemCrafted = null;
-                for (int targetLevel = level; targetLevel > 0; targetLevel--)
-                {
-                    var itemsAtLevel = items.Data.Where(x => x.Level == targetLevel);
-                    Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
-                    var itemsList = new List<ItemSchema>(itemsAtLevel);
-                    while (itemsList.Any())
-                    {
-                        item = itemsList.ElementAt(_random.Next(itemsList.Count()));
-                        total = await _character.CraftItems(item, craftAmount);
-                        if (total == 0)
-                        {
-                            itemsList.Remove(item);
-                            continue;
-                        }
-                        itemCrafted = item;
-                        break;
-                    }
-
-                    if (total > 0)
-                    {
-                        break;
-                    }
-                }
+                int total = await CraftItems(craftAmount, level, items, bankItems);
 
                 if (total == 0)
                 {
@@ -111,6 +82,66 @@ namespace Artifacts
             }
         }
 
+        private async Task<int> CraftItems(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
+        {
+            var total = 0;
+            for (int targetLevel = level; targetLevel > 0; targetLevel--)
+            {
+                total = await CraftItemsFromLevelDown(targetLevel, craftAmount, items.Data, bankItems);
+                if (total > 0)
+                {
+                    break;
+                }
+            }
+
+            if (total == 0)
+            {
+                var minLevel = Math.Max(level - 10, 1);
+                Console.WriteLine($"Too much in the bank for level {level}, crafting {craftAmount} of items from {minLevel} up");
+
+                for (int targetLevel = minLevel; targetLevel < level; targetLevel++)
+                {
+                    total = await CraftItemsFromLevelDown(targetLevel, craftAmount, items.Data, bankItems, ignoreBankCheck: true);
+                    if (total > 0)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return total;
+        }
+
+        private async Task<int> CraftItemsFromLevelDown(int targetLevel, int craftAmount, List<ItemSchema> items, List<SimpleItemSchema> bankItems, bool ignoreBankCheck = false)
+        {
+            const int TooMany = 5;
+            var total = 0;
+            var itemsAtLevel = items.Where(x => x.Level == targetLevel);
+            Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
+            var itemsList = new List<ItemSchema>(itemsAtLevel);
+            while (itemsList.Any())
+            {
+                var item = itemsList.ElementAt(_random.Next(itemsList.Count()));
+
+                var bankItem = bankItems.FirstOrDefault(x => x.Code == item.Code);
+                if (!ignoreBankCheck && bankItem != null && bankItem.Quantity > TooMany)
+                {
+                    itemsList.Remove(item);
+                    continue;
+                }
+
+                total = await _character.CraftItems(item, craftAmount);
+                if (total == 0)
+                {
+                    itemsList.Remove(item);
+                    continue;
+                }
+                break;
+            }
+
+            return total;
+        }
+
         private async Task Recycle()
         {
             const int TooMany = 5;
@@ -119,7 +150,7 @@ namespace Artifacts
             var bankItems = await Bank.Instance.GetItems();
             foreach (var bankItem in bankItems)
             {
-                if (bankItem.Quantity > TooMany * 2)
+                if (bankItem.Quantity > TooMany)
                 {
                     var item = await Items.Instance.GetItem(bankItem.Code);
 
@@ -146,6 +177,7 @@ namespace Artifacts
 
                                 // Start again to recheck state of the bank etc
                                 await Recycle();
+                                return;
                             }
                             catch (ApiException ex)
                             {

@@ -93,7 +93,7 @@ namespace Artifacts
 
         internal async Task TurnInItems(string code, int quantity)
         {
-            Console.WriteLine($"Turning in {quantity} of {code} for character {Name}");
+            Console.WriteLine($"Turning in {quantity} {code} for character {Name}");
             await Utils.ApiCall(async () =>
                 {
                     var item = new SimpleItemSchema(code, quantity);
@@ -103,7 +103,7 @@ namespace Artifacts
 
         internal async Task<int> CraftItems(ItemSchema item, int remaining)
         {
-            Console.WriteLine($"Crafting {remaining} of {item.Code} for character {Name}");
+            Console.WriteLine($"Crafting {remaining} {item.Code} for character {Name}");
             Console.WriteLine($"{item.Code}: {remaining}");
             Console.WriteLine($"{item.Code}: {remaining}");
             Console.WriteLine($"{item.Code}: {remaining}");
@@ -182,7 +182,7 @@ namespace Artifacts
                 {
                     if (ex.ErrorCode == 497)
                     {
-                        Console.WriteLine($"Inventory full for character {Name}, crafted {itemsCrafted} of {item.Code}");
+                        Console.WriteLine($"Inventory full for character {Name}, crafted {itemsCrafted} {item.Code}");
                     }
                     else if (ex.ErrorCode == 478)
                     {
@@ -195,13 +195,13 @@ namespace Artifacts
                 itemsCrafted++;
             }
 
-            Console.WriteLine($"Crafted {itemsCrafted} of {item.Code} for character {Name}");
+            Console.WriteLine($"Crafted {itemsCrafted} {item.Code} for character {Name}");
             return itemsCrafted;
         }
 
         internal async Task MoveClosest(MapContentType contentType, string code)
         {
-            Console.WriteLine($"Moving to closest {contentType} with code {code} for character {Name}");
+            Console.WriteLine($"Moving to closest {code} for character {Name}");
             var response = await Map.Instance.GetMapLayer(contentType, code);
             if (response.Data != null && response.Data.Any())
             {
@@ -249,26 +249,27 @@ namespace Artifacts
                 return await CraftItems(item, remaining);
             }
 
-            var monsters = Monsters.Instance.GetMonsters(maxLevel: 100, dropCode: item.Code);
-            if (monsters.Data.Any())
-            {
-                var monster = monsters.Data.MinBy(x => x.Level);
-                Console.WriteLine($"Need to fight for {code}, chasing {monster}");
-                if (monster.Level > Utils.Details.Level)
-                {
-                    Console.WriteLine("We can't beat this monster, bailing");
-                    return 0;
-                }
 
-                return await FightDrops(monster.Code, code, remaining);
-            }
-
-            Console.WriteLine($"Gathering {remaining} of {code} for character {Name}");
+            Console.WriteLine($"Gathering {remaining} {code} for character {Name}");
 
             var resourceCode = await Resources.Instance.GetResourceDrop(code);
             if (resourceCode == null)
             {
-                Console.WriteLine($"Way to gather, craft, or hunt for {code}, we cannot craft this\n");
+                var monsters = Monsters.Instance.GetMonsters(maxLevel: 100, dropCode: item.Code);
+                if (monsters.Data.Any())
+                {
+                    var monster = monsters.Data.MinBy(x => x.Level);
+                    Console.WriteLine($"Need to fight for {code}, chasing {monster}");
+                    if (monster.Level > Utils.Details.Level)
+                    {
+                        Console.WriteLine("We can't beat this monster, bailing");
+                        return 0;
+                    }
+
+                    return await FightDrops(monster.Code, code, remaining);
+                }
+
+                Console.WriteLine($"No way to gather, craft, or hunt for {code}, we cannot craft this\n");
                 return 0;
             }
 
@@ -402,15 +403,22 @@ namespace Artifacts
                     Console.WriteLine($"Fight results: {result.Data.Fight.ToString()}");
                     if (result.Data.Fight.Result == FightResult.Loss)
                     {
+                        const int Limit = 3;
                         losses++;
-                        if (losses > 3)
+                        Console.WriteLine($"loss {losses} of {Limit}");
+                        if (losses >= Limit)
                         {
                             Console.WriteLine($"We Lost! Giving up on getting drops for monster {monster}");
                             return 0;
                         }
                     }
+                    else
+                    {
+                        // Reset losses, we can beat him!
+                        losses = 0;
+                    }
 
-                    foreach(var character in result.Data.Fight.Characters)
+                    foreach (var character in result.Data.Fight.Characters)
                     {
                         if (character.Drops != null && character.Drops.Any())
                         {
@@ -535,7 +543,7 @@ namespace Artifacts
                 withdrawQuantity = Math.Min(withdrawQuantity, GetFreeInventorySpace());
             }
 
-            Console.WriteLine($"Try to withdraw {withdrawQuantity} of {code}");
+            Console.WriteLine($"Try to withdraw {withdrawQuantity} {code}");
 
             try
             {
@@ -615,18 +623,19 @@ namespace Artifacts
 
         private async Task Rest()
         {
-            Console.WriteLine("Rest");
-
             if (await EatSomething())
             {
                 Console.WriteLine("No time for rest, we ate!");
                 return;
             }
 
+            Console.WriteLine("Rest");
             await Utils.ApiCall(async () =>
             {
                 return await _api.ActionRestMyNameActionRestPostAsync(Name);
             });
+
+            Console.WriteLine("Finished Resting, back to it");
         }
 
         private async Task<bool> EatSomething()
@@ -681,7 +690,7 @@ namespace Artifacts
                 }
             }
 
-            return Utils.Details.Hp >= Utils.Details.MaxXp;
+            return false;
         }
 
         private async Task<CharacterFightResponseSchema> Fight()
@@ -857,6 +866,10 @@ namespace Artifacts
                     if (item.Type == "consumable" && item.Level <= Utils.Details.Level)
                     {
                         var amount = Math.Min(space, bankItem.Quantity);
+
+                        // Don't be greedy
+                        amount = Math.Min(amount, 20);
+
                         var withdrawn = await WithdrawItems(item.Code, amount);
                         space -= withdrawn;
                         if (space <= 0)
@@ -904,14 +917,23 @@ namespace Artifacts
             else
             {
                 Console.WriteLine($"Bank item {bestBankItem.Code} is highest value at {bankValue}");
-                // Best item is in the bank
+
+                var quantity = 1;
+
+                // Special case for utility slots, take 10 max
+                if (slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2)
+                {
+                    var bankItem = bankItems.First(x => x.Code == bestBankItem.Code);
+                    quantity = Math.Min(10, bankItem.Quantity);
+                }
+
                 await MoveTo(MapContentType.Bank);
-                if (await WithdrawItems(bestBankItem.Code, 1) > 0)
+                if (await WithdrawItems(bestBankItem.Code, quantity) > 0)
                 {
                     if (currentItem != null)
                         await Unequip(slotType);
 
-                    await Equip(bestBankItem.Code, slotType);
+                    await Equip(bestBankItem.Code, slotType, quantity);
                 }
             }
         }
@@ -956,6 +978,11 @@ namespace Artifacts
                 }
 
                 if (slotType == ItemSlot.Utility2 && inventoryItem.Code == Utils.Details.Utility1Slot)
+                {
+                    // Special case: we cannot have the same item in both utility slots
+                    continue;
+                }
+                if (slotType == ItemSlot.Utility1 && inventoryItem.Code == Utils.Details.Utility2Slot)
                 {
                     // Special case: we cannot have the same item in both utility slots
                     continue;
@@ -1015,18 +1042,12 @@ namespace Artifacts
             });
         }
 
-        private async Task Equip(string code, ItemSlot slotType, int quantity = 0)
+        private async Task Equip(string code, ItemSlot slotType, int quantity = 1)
         {
             await Utils.ApiCall(async () =>
             {
                 try
                 {
-                    var quantity = 1;
-                    if (slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2)
-                    {
-                        quantity = Utils.Details.Inventory.Where(x => x.Code == code).Sum(x => x.Quantity);
-                    }
-
                     Console.WriteLine($"Equip {quantity} {code} in {slotType}");
                     var response = await _api.ActionEquipItemMyNameActionEquipPostAsync(Name, new EquipSchema(code, slotType, quantity));
                     Console.WriteLine($"Equip response: {response.Data.Item.Code} equipped in slot {response.Data.Slot}");
@@ -1042,7 +1063,7 @@ namespace Artifacts
 
         internal async Task Recycle(string code, int recycleQuantity)
         {
-            Console.WriteLine($"Recycling {recycleQuantity} of {code}");
+            Console.WriteLine($"Recycling {recycleQuantity} {code}");
 
             await Utils.ApiCall(async () =>
             {
