@@ -1,7 +1,4 @@
 ﻿using ArtifactsMmoClient.Client;
-using ArtifactsMmoClient.Model;
-using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace Artifacts
 {
@@ -13,13 +10,23 @@ namespace Artifacts
         {
             if (args.Length < 2)
             {
-                Console.WriteLine("Usage: Artifacts <character-name> <roles>");
+                Console.WriteLine("Usage: Artifacts <character-name> <roles> <optional-args>");
                 return;
             }
+            Console.WriteLine($"Args init {args.Length} {string.Join(",", args)}");
 
             var name = args[0];
-            var roles = args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            Console.WriteLine($"Starting {name} roles {roles.ToJson()}");
+            var role = args[1];
+            string[] arguments = null;
+            if (args.Length > 2)
+            {
+                arguments = args.Skip(4).ToArray();
+                Console.WriteLine($"Starting {name} {role} {string.Join(",", arguments)}");
+            }
+            else
+            {
+                Console.WriteLine($"Starting {name} {role}");
+            }
 
             string tokenValue = File.ReadAllText("token.txt").Trim();
 
@@ -50,11 +57,7 @@ namespace Artifacts
             // Load character details to verify it exists
             await character.Init();
 
-            // Start at the bank with no inventory
-            await character.MoveTo(MapContentType.Bank);
-            await character.DepositAllItems();
-
-            var loop = new CharacterLoop(character, roles);
+            var loop = new CharacterLoop(character, role, arguments);
             await loop.RunAsync();
         }
     }

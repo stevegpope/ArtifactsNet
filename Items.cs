@@ -135,6 +135,7 @@ namespace Artifacts
                     case "hp":
                     case "boost_hp":
                     case "threat":
+                    case "inventory_space":
                     case "critical_strike":
                         value += effect.Value;
                         break;

@@ -1,10 +1,6 @@
 ﻿
-using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
-using Polly.Caching;
-using System.Net.Security;
-using Xunit.Abstractions;
 
 namespace Artifacts
 {
@@ -24,26 +20,32 @@ namespace Artifacts
 
             while (true)
             {
-                // Choose a craft skill
-                var skills = new[]
-                {
+                var skills = new List<string>([
                     "weaponcrafting",
                     "gearcrafting",
-                    "jewelrycrafting",
-                    "alchemy",
-                    "cooking",
-                };
+                    "jewelrycrafting"
+                    //"alchemy",
+                    //"cooking",
+                ]);
 
-                var skill = skills.ElementAt(_random.Next(skills.Length));
+                var miningSkill = Utils.GetSkillLevel("mining");
+                if (miningSkill >= 20)
+                {
+                    // Gems are available, include them
+                    skills.Add("mining");
+                }
+
+                // Choose a craft skill
+                var skill = skills.ElementAt(_random.Next(skills.Count));
 
                 int craftAmount = 1;
                 switch (skill)
                 {
                     case "weaponcrafting":
-                        break;
                     case "gearcrafting":
-                        break;
                     case "jewelrycrafting":
+                    case "mining":
+                        craftAmount = 1;
                         break;
                     case "alchemy":
                         craftAmount = 8;
@@ -60,7 +62,6 @@ namespace Artifacts
                 var level = Utils.GetSkillLevel(skill);
                 Console.WriteLine($"Crafter chose skill {skill} at level {level} with {craftSkill}");
 
-                // Choose the highest level thing we can craft
                 var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
                 Console.WriteLine($"{items.Data.Count} potential things to craft");
 
@@ -84,35 +85,94 @@ namespace Artifacts
 
         private async Task<int> CraftItems(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
         {
-            var total = 0;
-            for (int targetLevel = level; targetLevel > 0; targetLevel--)
+            int total = 0;
+
+            // One in ten crafting attempts to make best gear, the rest is training
+            if (_random.Next(10) <= 10)
             {
-                total = await CraftItemsFromLevelDown(targetLevel, craftAmount, items.Data, bankItems);
-                if (total > 0)
-                {
-                    break;
-                }
+                // For now, all highest level gear for the extra xp
+                Console.WriteLine("Make the best gear we can");
+                total = await CraftItemsFromLevelDown(craftAmount, level, items, bankItems);
+            }
+            else
+            {
+                Console.WriteLine("Craft training");
+                total = await CraftTraining(craftAmount, level, items, bankItems);
             }
 
             if (total == 0)
             {
-                var minLevel = Math.Max(level - 10, 1);
-                Console.WriteLine($"Too much in the bank for level {level}, crafting {craftAmount} of items from {minLevel} up");
+                total = await CraftItemsFromLevelUp(craftAmount, level, items, bankItems);
+            }
 
-                for (int targetLevel = minLevel; targetLevel < level; targetLevel++)
+            return total;
+        }
+
+        private async Task<int> CraftTraining(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
+        {
+            var minLevel = Math.Max(level - 10, 1);
+            Console.WriteLine($"Crafting training {craftAmount} items from {minLevel} up");
+
+            int total = 0;
+            for (int targetLevel = minLevel; targetLevel < level; targetLevel++)
+            {
+                var itemsAtLevel = items.Data.Where(x => x.Level == targetLevel);
+                Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
+                var itemsList = new List<ItemSchema>(itemsAtLevel);
+                while (itemsList.Any())
                 {
-                    total = await CraftItemsFromLevelDown(targetLevel, craftAmount, items.Data, bankItems, ignoreBankCheck: true);
-                    if (total > 0)
+                    var item = itemsList.MinBy(item => item.Craft.Items.Sum(c => c.Quantity));
+                    Console.WriteLine($"Item with the least components is {item.Code}");
+
+                    total = await _character.CraftItems(item, craftAmount);
+                    if (total == 0)
                     {
-                        break;
+                        itemsList.Remove(item);
+                        continue;
                     }
+                    return total;
                 }
             }
 
             return total;
         }
 
-        private async Task<int> CraftItemsFromLevelDown(int targetLevel, int craftAmount, List<ItemSchema> items, List<SimpleItemSchema> bankItems, bool ignoreBankCheck = false)
+        private async Task<int> CraftItemsFromLevelUp(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
+        {
+            var minLevel = Math.Max(level - 10, 1);
+            Console.WriteLine($"Crafting {craftAmount} items from {minLevel} up");
+
+            int total = 0;
+            for (int targetLevel = minLevel; targetLevel < level; targetLevel++)
+            {
+                total = await CraftItemsAtLevel(targetLevel, craftAmount, items.Data, bankItems, ignoreBankCheck: true);
+                if (total > 0)
+                {
+                    break;
+                }
+            }
+
+            return total;
+        }
+
+        private async Task<int> CraftItemsFromLevelDown(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
+        {
+            Console.WriteLine($"Crafting {craftAmount} items from {level} down");
+
+            int total = 0;
+            for (int targetLevel = level; targetLevel > 0; targetLevel--)
+            {
+                total = await CraftItemsAtLevel(targetLevel, craftAmount, items.Data, bankItems);
+                if (total > 0)
+                {
+                    break;
+                }
+            }
+
+            return total;
+        }
+
+        private async Task<int> CraftItemsAtLevel(int targetLevel, int craftAmount, List<ItemSchema> items, List<SimpleItemSchema> bankItems, bool ignoreBankCheck = false)
         {
             const int TooMany = 5;
             var total = 0;
@@ -123,11 +183,15 @@ namespace Artifacts
             {
                 var item = itemsList.ElementAt(_random.Next(itemsList.Count()));
 
-                var bankItem = bankItems.FirstOrDefault(x => x.Code == item.Code);
-                if (!ignoreBankCheck && bankItem != null && bankItem.Quantity > TooMany)
+                if (!ignoreBankCheck)
                 {
-                    itemsList.Remove(item);
-                    continue;
+                    var currentAmount = await CountAmountOnCharacters(item.Code);
+                    currentAmount += bankItems.Where(x => x.Code == item.Code).Sum(x => x.Quantity);
+                    if (currentAmount > TooMany)
+                    {
+                        itemsList.Remove(item);
+                        continue;
+                    }
                 }
 
                 total = await _character.CraftItems(item, craftAmount);
@@ -137,6 +201,34 @@ namespace Artifacts
                     continue;
                 }
                 break;
+            }
+
+            return total;
+        }
+
+        private async Task<int> CountAmountOnCharacters(string code)
+        {
+            var characters = await _character.GetAllCharacters();
+            var total = 0;
+            foreach (var character in characters)
+            {
+                if (code == character.AmuletSlot) total++;
+                if (code == character.Artifact1Slot) total++;
+                if (code == character.Artifact2Slot) total++;
+                if (code == character.Artifact3Slot) total++;
+                if (code == character.BagSlot) total++;
+                if (code == character.BodyArmorSlot) total++;
+                if (code == character.BootsSlot) total++;
+                if (code == character.HelmetSlot) total++;
+                if (code == character.LegArmorSlot) total++;
+                if (code == character.Ring1Slot) total++;
+                if (code == character.Ring2Slot) total++;
+                if (code == character.ShieldSlot) total++;
+                if (code == character.Utility1Slot) total += character.Utility1SlotQuantity;
+                if (code == character.Utility2Slot) total += character.Utility2SlotQuantity;
+                if (code == character.WeaponSlot) total++;
+
+                total += character.Inventory.Where(x => x.Code == code).Sum(x => x.Quantity);
             }
 
             return total;

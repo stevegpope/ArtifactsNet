@@ -18,6 +18,7 @@ namespace Artifacts
         internal async Task RunAsync()
         {
             Console.WriteLine($"Starting tasker loop");
+            await ExchangeCoins();
 
             if (string.IsNullOrEmpty(Utils.Details.Task))
             {
@@ -41,7 +42,7 @@ namespace Artifacts
                     await HandleItemsTask();
                     await _character.MoveTo(MapContentType.TasksMaster, "items");
                     await FinishTask();
-                    await _character.MoveTo(MapContentType.TasksMaster, "monsters");
+                    await _character.MoveTo(MapContentType.TasksMaster, "items");
                     await AcceptNewTask();
                 }
                 else if (Utils.Details.TaskType == "monsters")
@@ -59,6 +60,40 @@ namespace Artifacts
 
                 await _character.MoveTo(MapContentType.Bank);
                 await _character.DepositAllItems();
+
+                await ExchangeCoins();
+            }
+        }
+
+        private async Task ExchangeCoins()
+        {
+            Console.WriteLine("Try to exchange coins");
+            // Assumes we start at the bank
+            var bankItems = await Bank.Instance.GetItems();
+            foreach (var item in bankItems)
+            {
+                if (item.Code == "tasks_coin" && item.Quantity >= 6)
+                {
+                    var amount = await _character.WithdrawItems("tasks_coin");
+                    if (amount >= 6)
+                    {
+                        Console.WriteLine($"Got {amount} coins, going to exchange");
+                        await _character.MoveTo(MapContentType.TasksMaster);
+
+                        while (amount >= 6)
+                        {
+                            Console.WriteLine($"Exchange task coins");
+                            await Utils.ApiCall(async () =>
+                            {
+                                var result = await _api.ActionTaskExchangeMyNameActionTaskExchangePostAsync(_character.Name);
+                                Console.WriteLine($"Got rewards: {result.Data.Rewards.Gold} gold, {string.Join(',', result.Data.Rewards.Items.Select(item => item.Code))}");
+                                return result;
+                            });
+
+                            amount -= 6;
+                        }
+                    }
+                }
             }
         }
 
@@ -79,7 +114,12 @@ namespace Artifacts
             await Utils.ApiCall(async () =>
             {
                 var result = await _api.ActionCompleteTaskMyNameActionTaskCompletePostAsync(_character.Name);
-                Console.WriteLine($"Finished task! Rewards! {result.Data.Rewards}");
+                Console.WriteLine($"Finished task! {result.Data.Rewards.Gold} Gold");
+                foreach(var item in result.Data.Rewards.Items)
+                {
+                    Console.WriteLine($"drop: {item.Quantity} {item.Code}"); 
+                }
+
                 return result;
             });
         }
@@ -127,6 +167,7 @@ namespace Artifacts
             while (Utils.Details.TaskProgress < Utils.Details.TaskTotal)
             {
                 var remaining = Utils.Details.TaskTotal - Utils.Details.TaskProgress;
+                Console.WriteLine($"{remaining} {Utils.Details.Task} left for task");
                 var retrieved = await DepositNonQuestItemsAndGetMore();
 
                 // Do we already have the items in inventory?
@@ -135,6 +176,7 @@ namespace Artifacts
                     if (inventory.Code == Utils.Details.Task && inventory.Quantity > 0)
                     {
                         await ExchangeItems(inventory.Code, inventory.Quantity, remaining);
+                        remaining -= inventory.Quantity;
                         continue;
                     }
                 }

@@ -13,7 +13,7 @@
     },
     "baz3": {
       "commandName": "Project",
-      "commandLineArgs": "baz3 fighter"
+      "commandLineArgs": "baz3 craft_specific d d cooked_chicken 2000"
     },
     "baz4": {
       "commandName": "Project",
@@ -21,7 +21,7 @@
     },
     "baz5": {
       "commandName": "Project",
-      "commandLineArgs": "baz5 fighter"
+      "commandLineArgs": "baz5 craft_specific dummy dummy cooked_chicken 3000"
     }
   }
 }

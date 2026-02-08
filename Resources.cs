@@ -64,21 +64,21 @@ namespace Artifacts
             }
         }
 
-        internal async Task<string> GetResourceDrop(string drop)
+        internal async Task<ResourceSchema> GetResourceDrop(string drop)
         {
-            string resourceCode = null;
+            ResourceSchema resource = null;
             await Utils.ApiCall(async () =>
             {
                 var result = await _api.GetAllResourcesResourcesGetAsync(drop: drop);
                 var data = result.Data;
                 if (data.Any())
                 {
-                    resourceCode = result.Data.FirstOrDefault().Code;
+                    resource = result.Data.FirstOrDefault();
                 }
                 return result;
             });
 
-            return resourceCode;
+            return resource;
         }
 
         internal async Task<string> GetResourceSkill(ItemSchema item)
