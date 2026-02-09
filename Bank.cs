@@ -41,7 +41,23 @@ namespace Artifacts
 
         internal async Task<List<SimpleItemSchema>> GetItems()
         {
-            var result = await _api.GetBankItemsMyBankItemsGetAsync();
+            var pageNum = 1;
+            var result = new List<SimpleItemSchema>();
+            DataPageSimpleItemSchema page = null;
+
+            do
+            {
+                page = await _api.GetBankItemsMyBankItemsGetAsync(page: pageNum);
+                result.AddRange(page.Data.Where(i => i.Quantity > 0));
+                pageNum++;
+            } while (pageNum <= page.Pages);
+
+            return result;
+        }
+
+        internal async Task<BankSchema> GetBankDetails()
+        {
+            var result = await _api.GetBankDetailsMyBankGetAsync();
             return result.Data;
         }
     }

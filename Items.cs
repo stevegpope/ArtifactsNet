@@ -8,9 +8,11 @@ namespace Artifacts
     internal class Items
     {
         private ItemsApi _api;
+        private TasksApi _tasks;
         private static Configuration _config;
         private static HttpClient _httpClient;
         private static Dictionary<string, ItemSchema> _cache = null;
+        private List<DropRateSchema> _taskItems;
 
         internal static Items Instance => lazy.Value;
 
@@ -39,6 +41,7 @@ namespace Artifacts
             )
         {
             _api = new ItemsApi(httpClient, config);
+            _tasks = new TasksApi(httpClient, config);
         }
 
         private async Task CacheItems()
@@ -62,7 +65,15 @@ namespace Artifacts
                         break;
                     }
                 }
+
+                var taskItems = await _tasks.GetAllTasksRewardsTasksRewardsGetAsync();
+                _taskItems = taskItems.Data;
             }
+        }
+
+        internal async Task<List<DropRateSchema>> GetTaskItems()
+        {
+            return _taskItems;
         }
 
         internal async Task<ItemSchema> GetItem(string code)

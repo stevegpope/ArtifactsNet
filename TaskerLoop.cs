@@ -124,76 +124,38 @@ namespace Artifacts
             });
         }
 
-        private async Task<int> DepositNonQuestItemsAndGetMore()
-        {
-            // Go to bank and deposit all items to make room
-            await _character.MoveTo(MapContentType.Bank);
-            await _character.DepositAllItems();
-
-            var itemsTotal = 0;
-            var questItems = await GetQuestItems();
-            foreach (var item in questItems)
-            {
-                // Get any quest items from bank
-                itemsTotal += await _character.WithdrawItems(item);
-            }
-
-            return itemsTotal;
-        }
-
-        private async Task<List<string>> GetQuestItems()
-        {
-            var items = new List<string>
-            {
-                // Add the original item
-                Utils.Details.Task
-            };
-
-            // Add any craft components
-            var item = await Items.Instance.GetItem(Utils.Details.Task);
-            if (item.Craft != null)
-            {
-                foreach (var component in item.Craft.Items)
-                {
-                    items.Add(component.Code);
-                }
-            }
-
-            return items;
-        }
-
         private async Task HandleItemsTask()
         {
             while (Utils.Details.TaskProgress < Utils.Details.TaskTotal)
             {
                 var remaining = Utils.Details.TaskTotal - Utils.Details.TaskProgress;
                 Console.WriteLine($"{remaining} {Utils.Details.Task} left for task");
-                var retrieved = await DepositNonQuestItemsAndGetMore();
 
-                // Do we already have the items in inventory?
-                foreach (var inventory in Utils.Details.Inventory)
+                // Go to bank and deposit all items to make room
+                await _character.MoveTo(MapContentType.Bank);
+                await _character.DepositAllItems();
+
+                var withdrawn = await _character.WithdrawItems(Utils.Details.Task, remaining);
+                if (withdrawn > 0)
                 {
-                    if (inventory.Code == Utils.Details.Task && inventory.Quantity > 0)
-                    {
-                        await ExchangeItems(inventory.Code, inventory.Quantity, remaining);
-                        remaining -= inventory.Quantity;
-                        continue;
-                    }
+                    await ExchangeItems(Utils.Details.Task, withdrawn, remaining);
+                    remaining -= withdrawn;
                 }
 
-                // Either craft the item, or go gather it
-                var item = await Items.Instance.GetItem(Utils.Details.Task);
-
-                // Go gather, craft, or hunt down the item
-                Console.WriteLine($"Fetching item {item.Name}");
-                var gathered = await _character.GatherItems(item.Code, remaining);
-                await ExchangeItems(Utils.Details.Task, gathered, remaining);
+                if (remaining > 0)
+                {
+                    // Go gather, craft, or hunt down the item
+                    Console.WriteLine($"Fetching item {Utils.Details.Task}");
+                    var gathered = await _character.GatherItems(Utils.Details.Task, remaining);
+                    await ExchangeItems(Utils.Details.Task, gathered, remaining);
+                }
             }
         }
+
         private async Task ExchangeItems(string code, int quantity, int remaining)
         {
             // Go to task master to turn in items
-            Console.WriteLine($"Moving to task master to turn in items from inventory");
+            Console.WriteLine($"Moving to task master to turn in {quantity} items from inventory");
             await _character.MoveTo(MapContentType.TasksMaster, "items");
             await _character.TurnInItems(code, Math.Min(quantity, remaining));
         }

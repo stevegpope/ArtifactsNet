@@ -100,11 +100,32 @@ namespace Artifacts
         internal async Task TurnInItems(string code, int quantity)
         {
             Console.WriteLine($"Turning in {quantity} {code} for character {Name}");
-            await Utils.ApiCall(async () =>
+            try
+            {
+                await Utils.ApiCall(async () =>
                 {
                     var item = new SimpleItemSchema(code, quantity);
                     return await _api.ActionTaskTradeMyNameActionTaskTradePostAsync(Name, item);
                 });
+            }
+            catch(ApiException ex)
+            {
+                Console.WriteLine($"Error trading in items {ex.ErrorContent}");
+                if (ex.ErrorCode == 478)
+                {
+                    // Inventory dump
+                    Console.WriteLine("Inventory dump");
+                    foreach(var item in Utils.Details.Inventory)
+                    {
+                        if (item.Quantity > 0)
+                        {
+                            Console.WriteLine($"{item.Quantity} {item.Code}");
+                        }
+                    }
+                }
+
+                throw;
+            }
         }
 
         internal async Task<int> CraftItems(ItemSchema item, int remaining)
@@ -160,14 +181,48 @@ namespace Artifacts
                 foreach (var component in item.Craft.Items)
                 {
                     var gatherQuantity = gatherQuantities[component.Code];
-                    if (gatherQuantity > 0)
+                    while (gatherQuantity > 0)
                     {
                         var gathered = await GatherItems(component.Code, gatherQuantity);
+                        Console.WriteLine($"Gathered {gathered} {component.Code} of {gatherQuantities[component.Code]}");
                         if (gathered == 0)
                         {
                             Console.WriteLine($"We cannot gather {component.Code}!");
+
+                            // If this is a task item, go do an item task and come back
+                            var taskItems = await Items.Instance.GetTaskItems();
+                            if (taskItems.Any(x => x.Code == component.Code))
+                            {
+                                await ExchangeCoins();
+
+                                if (string.IsNullOrEmpty(Utils.Details.Task))
+                                {
+                                    // Go to task master
+                                    await AcceptNewTask();
+                                }
+
+                                Console.WriteLine($"Current task:\n + " +
+                                    $"task : {Utils.Details.Task}\n" +
+                                    $"task type : {Utils.Details.TaskType}\n" +
+                                    $"task progress : {Utils.Details.TaskProgress}/{Utils.Details.TaskTotal}");
+
+                                if (Utils.Details.TaskType == "monsters")
+                                {
+                                    await HandleMonstersTask();
+                                    await MoveTo(MapContentType.TasksMaster, "monsters");
+                                    await FinishTask();
+                                    await MoveTo(MapContentType.TasksMaster, "items");
+                                    await AcceptNewTask();
+                                }
+
+                                await DoItemTask();
+                                await ExchangeCoins();
+                            }
+
                             return 0;
                         }
+
+                        gatherQuantity -= gathered;
                     }
                 }
 
@@ -217,6 +272,127 @@ namespace Artifacts
             return itemsCrafted;
         }
 
+        private async Task DoMonstersTask()
+        {
+            await HandleMonstersTask();
+            await MoveTo(MapContentType.TasksMaster, "monsters");
+            await FinishTask();
+        }
+
+        private async Task DoItemTask()
+        {
+            await HandleItemsTask();
+            await MoveTo(MapContentType.TasksMaster, "items");
+            await FinishTask();
+        }
+
+        private async Task FinishTask()
+        {
+            await Utils.ApiCall(async () =>
+            {
+                var result = await _api.ActionCompleteTaskMyNameActionTaskCompletePostAsync(Name);
+                Console.WriteLine($"Finished task! {result.Data.Rewards.Gold} Gold");
+                foreach (var item in result.Data.Rewards.Items)
+                {
+                    Console.WriteLine($"drop: {item.Quantity} {item.Code}");
+                }
+
+                return result;
+            });
+        }
+
+        private async Task HandleItemsTask()
+        {
+            while (Utils.Details.TaskProgress < Utils.Details.TaskTotal)
+            {
+                var remaining = Utils.Details.TaskTotal - Utils.Details.TaskProgress;
+                Console.WriteLine($"{remaining} {Utils.Details.Task} left for task");
+
+                // Go to bank and deposit all items to make room
+                await MoveTo(MapContentType.Bank);
+                await DepositAllItems();
+
+                var withdrawn = await WithdrawItems(Utils.Details.Task, remaining);
+                if (withdrawn > 0)
+                {
+                    await ExchangeItems(Utils.Details.Task, withdrawn, remaining);
+                    remaining -= withdrawn;
+                }
+
+                if (remaining > 0)
+                {
+                    // Go gather, craft, or hunt down the item
+                    Console.WriteLine($"Fetching item {Utils.Details.Task}");
+                    var gathered = await GatherItems(Utils.Details.Task, remaining);
+                    await ExchangeItems(Utils.Details.Task, gathered, remaining);
+                }
+            }
+        }
+
+        private async Task HandleMonstersTask()
+        {
+            while (Utils.Details.TaskProgress < Utils.Details.TaskTotal)
+            {
+                var remaining = Utils.Details.TaskTotal - Utils.Details.TaskProgress;
+                var monster = Utils.Details.Task;
+                await FightLoop(remaining, monster);
+            }
+        }
+
+        private async Task ExchangeItems(string code, int quantity, int remaining)
+        {
+            // Go to task master to turn in items
+            Console.WriteLine($"Moving to task master to turn in {quantity} items from inventory");
+            await MoveTo(MapContentType.TasksMaster, "items");
+            await TurnInItems(code, Math.Min(quantity, remaining));
+        }
+
+        private async Task AcceptNewTask()
+        {
+            // Get new task
+            await MoveTo(MapContentType.TasksMaster, code: "items");
+            Console.WriteLine($"Getting new task");
+            await Utils.ApiCall(async () =>
+            {
+                var result = await _api.ActionAcceptNewTaskMyNameActionTaskNewPostAsync(Name);
+                Console.WriteLine($"new task: " + result.Data.Task.ToJson());
+                return result;
+            });
+        }
+
+        private async Task ExchangeCoins()
+        {
+            Console.WriteLine("Try to exchange coins");
+
+            var bankItems = await Bank.Instance.GetItems();
+            foreach (var item in bankItems)
+            {
+                if (item.Code == "tasks_coin" && item.Quantity >= 6)
+                {
+                    await MoveTo(MapContentType.Bank);
+                    var amount = await WithdrawItems("tasks_coin");
+                    if (amount >= 6)
+                    {
+                        Console.WriteLine($"Got {amount} coins, going to exchange");
+                        await MoveTo(MapContentType.TasksMaster);
+
+                        while (amount >= 6)
+                        {
+                            Console.WriteLine($"Exchange task coins");
+                            await Utils.ApiCall(async () =>
+                            {
+                                var result = await _api.ActionTaskExchangeMyNameActionTaskExchangePostAsync(Name);
+                                Console.WriteLine($"Got rewards: {result.Data.Rewards.Gold} gold, {string.Join(',', result.Data.Rewards.Items.Select(item => item.Code))}");
+                                return result;
+                            });
+
+                            amount -= 6;
+                        }
+                    }
+                }
+            }
+        }
+
         private int CalculateCraftingBatchSize(int perItemInventorySpace)
         {
             var space = GetFreeInventorySpace();
@@ -242,9 +418,10 @@ namespace Artifacts
             }
         }
 
-        internal async Task<int> GatherItems(string code, int remaining, bool skipBank = false, ItemSchema doNotUse = null)
+        internal async Task<int> GatherItems(string code, int total, bool skipBank = false, ItemSchema doNotUse = null)
         {
-            Console.WriteLine($"Gather {remaining} {code}");
+            Console.WriteLine($"Gather {total} {code}");
+            var withdrawn = 0;
 
             if (!skipBank)
             {
@@ -255,27 +432,27 @@ namespace Artifacts
                 {
                     Console.WriteLine($"Found {bankItemAmount} {code} in the bank, going to get them");
                     await MoveTo(MapContentType.Bank);
-                    var quantity = Math.Min(remaining, bankItemAmount);
-                    var withdrawn = await WithdrawItems(code, quantity);
-                    Console.WriteLine($"Withdrew {withdrawn} {code} from the bank, compare to {remaining}");
-                    if (withdrawn == remaining)
+                    var quantity = Math.Min(total, bankItemAmount);
+                    withdrawn = await WithdrawItems(code, quantity);
+                    if (withdrawn == total)
                     {
                         // Found all we need in the bank
                         return quantity;
                     }
 
-                    remaining -= withdrawn;
-                    Console.WriteLine($"Did not get enough from the bank, still need {remaining}");
+                    Console.WriteLine($"Did not get enough from the bank, still need {total - withdrawn}");
                 }
             }
+
+            var remaining = total - withdrawn;
 
             var item = await Items.Instance.GetItem(code);
             if (item.Craft != null)
             {
                 Console.WriteLine($"Need to craft {code}");
-                return await CraftItems(item, remaining);
+                var crafted = await CraftItems(item, remaining);
+                return crafted + withdrawn;
             }
-
 
             var resource = await Resources.Instance.GetResourceDrop(code);
             if (resource == null)
@@ -288,10 +465,11 @@ namespace Artifacts
                     if (monster.Level > Utils.Details.Level)
                     {
                         Console.WriteLine("We can't beat this monster, bailing");
-                        return 0;
+                        return withdrawn;
                     }
 
-                    return await FightDrops(monster.Code, code, remaining);
+                    var drops = await FightDrops(monster.Code, code, remaining);
+                    return drops + withdrawn;
                 }
 
                 Console.WriteLine($"No way to gather, craft, or hunt for {code}, we cannot craft this\n");
@@ -308,7 +486,7 @@ namespace Artifacts
             var leftToGet = remaining - gathered;
             while (leftToGet > 0)
             {
-                var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: leftToGet * 27);
+                var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: leftToGet * Utils.LastCooldown);
                 Console.WriteLine($"Gather {gathered}/{remaining} {code}. ETA: {estimatedTime}");
                 try
                 {
@@ -336,10 +514,8 @@ namespace Artifacts
                 {
                     if (ex.ErrorCode == 497)
                     {
-                        Console.WriteLine("Inventory full, be right back");
-                        await MoveTo(MapContentType.Bank);
-                        await DepositAllItems();
-                        return await GatherItems(code, leftToGet);
+                        Console.WriteLine("Inventory full, done for now");
+                        return gathered + withdrawn;
                     }
                     else if (ex.ErrorCode == 493)
                     {
@@ -349,14 +525,15 @@ namespace Artifacts
                         Console.WriteLine($"Back from training, gathering {leftToGet} {code}");
                         await MoveTo(MapContentType.Bank);
                         await DepositAllItems();
-                        return await GatherItems(code, leftToGet);
+                        gathered += await GatherItems(code, leftToGet);
+                        return gathered + withdrawn;
                     }
 
                     throw;
                 }
             }
 
-            return gathered;
+            return gathered + withdrawn;
         }
 
         private async Task TrainSkill(string skill, int levelGoal, ItemSchema doNotUse = null)
@@ -435,16 +612,7 @@ namespace Artifacts
                 await MoveTo(MapContentType.Monster, code: monster);
 
                 // If we are healthy enough fight right away
-                var needsRest = false;
-                if (lostLastFight == 0 && Utils.Details.Hp < Utils.Details.MaxXp * .75)
-                {
-                    needsRest = true;
-                }
-                else if (Utils.Details.Hp < lostLastFight)
-                {
-                    needsRest |= true;
-                }
-
+                var needsRest = Utils.Details.Hp < Utils.Details.MaxHp * .5;
                 if (needsRest)
                 {
                     await Rest();
@@ -510,37 +678,61 @@ namespace Artifacts
                     continue;
                 }
 
-                await Utils.ApiCall(async () =>
+                try
                 {
-                    var items = new List<SimpleItemSchema>
+                    Console.WriteLine($"Deposit {item.Code} {item.Quantity}");
+                    await Utils.ApiCall(async () =>
                     {
-                        new SimpleItemSchema(item.Code, item.Quantity)
-                    };
+                        var items = new List<SimpleItemSchema>
+                        {
+                            new SimpleItemSchema(item.Code, item.Quantity)
+                        };
 
-                    try
-                    {
-                        Console.WriteLine($"Deposit {item.Code} {item.Quantity}");
                         return await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
-                    }
-                    catch (ApiException ex)
+                    });
+                }
+                catch (ApiException ex)
+                {
+                    if (ex.ErrorCode == 478)
                     {
-                        if (ex.ErrorCode == 478)
-                        {
-                            // We don't have enough of this item??
-                            return null;
-                        }
-                        else if (ex.ErrorCode == 461)
-                        {
-                            // Already in transaction?
-                            Console.WriteLine($"Item {item.Quantity} {item.Code} already in transaction");
-                            return null;
-                        }
-
-                        throw;
+                        // We don't have enough of this item??
+                        Console.WriteLine($"We do not have {item.Quantity} {item.Code}");
                     }
-                });
+                    else if (ex.ErrorCode == 461)
+                    {
+                        // Already in transaction?
+                        Console.WriteLine($"Item {item.Quantity} {item.Code} already in transaction");
+                    }
+                    else if (ex.ErrorCode == 462)
+                    {
+                        Console.WriteLine("Bank is full, trying to expand");
+                        await ExpandBank();
+                        await DepositAllItems();
+                        return;
+                    }
+
+                    throw;
+                }
             }
 
+        }
+
+        private async Task ExpandBank()
+        {
+            var bankDetails = await Bank.Instance.GetBankDetails();
+            var withdrawn = await WithdrawGold(bankDetails.NextExpansionCost);
+
+            while (withdrawn == bankDetails.NextExpansionCost)
+            {
+                Console.WriteLine($"{Name} buying bank expansion for {bankDetails.NextExpansionCost}");
+                await Utils.ApiCall(async () =>
+                {
+                    return _api.ActionBuyBankExpansionMyNameActionBankBuyExpansionPostAsync(Name);
+                });
+
+                bankDetails = await Bank.Instance.GetBankDetails();
+                withdrawn = await WithdrawGold(bankDetails.NextExpansionCost);
+            }
         }
 
         internal async Task DepositExcept(List<string> excludeCodes)
@@ -583,6 +775,27 @@ namespace Artifacts
                 var response = await _api.ActionDepositBankGoldMyNameActionBankDepositGoldPostAsync(Name, new DepositWithdrawGoldSchema(quantity: Utils.Details.Gold));
                 return response;
             });
+        }
+
+        internal async Task<int> WithdrawGold(int quantity)
+        {
+            try
+            {
+                await Utils.ApiCall(async () =>
+                {
+                    Console.WriteLine($"Withdrawing {quantity} gold for character {Name}");
+                    var response = await _api.ActionWithdrawBankGoldMyNameActionBankWithdrawGoldPostAsync(Name, new DepositWithdrawGoldSchema(quantity: quantity));
+                    return response;
+                });
+
+                return quantity;
+            }
+            catch (ApiException ex)
+            {
+                Console.WriteLine($"Error trying to get gold {ex.ErrorContent}");
+            }
+
+            return 0;
         }
 
         internal async Task<int> WithdrawItems(string code, int quantity = 0)
@@ -890,7 +1103,6 @@ namespace Artifacts
             {
                 if (doNotUse != null && doNotUse.Code == bankItem.Code)
                 {
-                    Console.WriteLine($"Intentionally not choosing {doNotUse.Code} from bank");
                     continue;
                 }
 
@@ -923,7 +1135,6 @@ namespace Artifacts
 
                 if (doNotUse != null && inventoryItem.Code == doNotUse.Code)
                 {
-                    Console.WriteLine($"Intentionally not choosing {doNotUse.Code} from inventory");
                     continue;
                 }
 
@@ -1025,9 +1236,25 @@ namespace Artifacts
 
             foreach (var recipe in recipes)
             {
+                var quantity = int.MaxValue;
                 foreach(var component in recipe.Craft.Items)
                 {
+                    var bankItem = bankItems.FirstOrDefault(x => x.Code == component.Code);
+                    if (bankItem != null)
+                    {
+                        quantity = Math.Min(quantity, bankItem.Quantity / component.Quantity);
+                    }
+                    else
+                    {
+                        quantity = 0;
+                        break;
+                    }
+                }
 
+                if (quantity != 0 && quantity != int.MaxValue)
+                {
+                    var cooked = await GatherItems(recipe.Code, quantity, skipBank: true);
+                    Console.WriteLine($"Chef Cooked {cooked} {recipe.Code}");
                 }
             }
         }

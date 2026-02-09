@@ -1,6 +1,7 @@
 ﻿
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using System;
 
 namespace Artifacts
 {
@@ -23,17 +24,8 @@ namespace Artifacts
                 var skills = new List<string>([
                     "weaponcrafting",
                     "gearcrafting",
-                    "jewelrycrafting"
-                    //"alchemy",
-                    //"cooking",
+                    "jewelrycrafting",
                 ]);
-
-                var miningSkill = Utils.GetSkillLevel("mining");
-                if (miningSkill >= 20)
-                {
-                    // Gems are available, include them
-                    skills.Add("mining");
-                }
 
                 // Choose a craft skill
                 var skill = skills.ElementAt(_random.Next(skills.Count));
@@ -44,14 +36,7 @@ namespace Artifacts
                     case "weaponcrafting":
                     case "gearcrafting":
                     case "jewelrycrafting":
-                    case "mining":
                         craftAmount = 1;
-                        break;
-                    case "alchemy":
-                        craftAmount = 8;
-                        break;
-                    case "cooking":
-                        craftAmount = 8;
                         break;
                     default:
                         throw new Exception($"Unexpected skill {skill}");
@@ -68,7 +53,6 @@ namespace Artifacts
                 var bankItems = await Bank.Instance.GetItems();
 
                 int total = await CraftItems(craftAmount, level, items, bankItems);
-
                 if (total == 0)
                 {
                     throw new Exception($"Nothing we can craft for skill {skill}");
@@ -87,51 +71,11 @@ namespace Artifacts
         {
             int total = 0;
 
-            // One in ten crafting attempts to make best gear, the rest is training
-            if (_random.Next(10) <= 10)
-            {
-                // For now, all highest level gear for the extra xp
-                Console.WriteLine("Make the best gear we can");
-                total = await CraftItemsFromLevelDown(craftAmount, level, items, bankItems);
-            }
-            else
-            {
-                Console.WriteLine("Craft training");
-                total = await CraftTraining(craftAmount, level, items, bankItems);
-            }
-
+            Console.WriteLine("Make the best gear we can");
+            total = await CraftItemsFromLevelDown(craftAmount, level, items, bankItems);
             if (total == 0)
             {
                 total = await CraftItemsFromLevelUp(craftAmount, level, items, bankItems);
-            }
-
-            return total;
-        }
-
-        private async Task<int> CraftTraining(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
-        {
-            var minLevel = Math.Max(level - 10, 1);
-            Console.WriteLine($"Crafting training {craftAmount} items from {minLevel} up");
-
-            int total = 0;
-            for (int targetLevel = minLevel; targetLevel < level; targetLevel++)
-            {
-                var itemsAtLevel = items.Data.Where(x => x.Level == targetLevel);
-                Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
-                var itemsList = new List<ItemSchema>(itemsAtLevel);
-                while (itemsList.Any())
-                {
-                    var item = itemsList.MinBy(item => item.Craft.Items.Sum(c => c.Quantity));
-                    Console.WriteLine($"Item with the least components is {item.Code}");
-
-                    total = await _character.CraftItems(item, craftAmount);
-                    if (total == 0)
-                    {
-                        itemsList.Remove(item);
-                        continue;
-                    }
-                    return total;
-                }
             }
 
             return total;
@@ -178,20 +122,29 @@ namespace Artifacts
             var total = 0;
             var itemsAtLevel = items.Where(x => x.Level == targetLevel);
             Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
+            if (!itemsAtLevel.Any())
+            {
+                return 0;
+            }
+
             var itemsList = new List<ItemSchema>(itemsAtLevel);
+            var characters = await _character.GetAllCharacters();
             while (itemsList.Any())
             {
                 var item = itemsList.ElementAt(_random.Next(itemsList.Count()));
 
                 if (!ignoreBankCheck)
                 {
-                    var currentAmount = await CountAmountOnCharacters(item.Code);
-                    currentAmount += bankItems.Where(x => x.Code == item.Code).Sum(x => x.Quantity);
-                    if (currentAmount > TooMany)
+                    var currentAmount = await CountAmountEverywhere(item.Code, characters, bankItems);
+
+                    if (currentAmount >= TooMany)
                     {
+                        Console.WriteLine($"We already have enough ({currentAmount}) {item.Code}");
                         itemsList.Remove(item);
                         continue;
                     }
+
+                    Console.WriteLine($"We will craft {item.Code}, current inventory {currentAmount}");
                 }
 
                 total = await _character.CraftItems(item, craftAmount);
@@ -203,13 +156,19 @@ namespace Artifacts
                 break;
             }
 
+            if (total == 0)
+            {
+                Console.WriteLine($"Already have enough items at this level, crafting without bank check");
+                return await CraftItemsAtLevel(targetLevel, craftAmount, items, bankItems, ignoreBankCheck: true);
+            }
+
             return total;
         }
 
-        private async Task<int> CountAmountOnCharacters(string code)
+        private async Task<int> CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
         {
-            var characters = await _character.GetAllCharacters();
             var total = 0;
+
             foreach (var character in characters)
             {
                 if (code == character.AmuletSlot) total++;
@@ -231,54 +190,124 @@ namespace Artifacts
                 total += character.Inventory.Where(x => x.Code == code).Sum(x => x.Quantity);
             }
 
+            total += bankItems.Where(x => x.Code == code).Sum(x => x.Quantity);
+
             return total;
         }
 
         private async Task Recycle()
         {
-            const int TooMany = 5;
-
             // If there are too many of this item, try to recycle some
             var bankItems = await Bank.Instance.GetItems();
+            var characters = await _character.GetAllCharacters();
             foreach (var bankItem in bankItems)
             {
-                if (bankItem.Quantity > TooMany)
+                var recycleQuantity = await CalculateRecycleQuantity(bankItems, characters, bankItem);
+
+                if (recycleQuantity > 0)
                 {
-                    var item = await Items.Instance.GetItem(bankItem.Code);
-
-                    // Can we recycle it?
-                    if (item.Craft != null && 
-                        (item.Craft.Skill == CraftSkill.Gearcrafting || 
-                        item.Craft.Skill == CraftSkill.Jewelrycrafting ||
-                        item.Craft.Skill == CraftSkill.Weaponcrafting))
+                    var amount = await _character.WithdrawItems(bankItem.Code, recycleQuantity);
+                    if (amount > 0)
                     {
-                        var recycleQuantity = bankItem.Quantity - TooMany;
-                        var amount = await _character.WithdrawItems(bankItem.Code, recycleQuantity);
-                        if (amount > 0)
+                        try
                         {
-                            try
-                            {
-                                // Go to relevant workshop
-                                await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
+                            var item = await Items.Instance.GetItem(bankItem.Code);
 
-                                await _character.Recycle(item.Code, amount);
+                            // Go to relevant workshop
+                            await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
 
-                                // Bank to bank for deposit
-                                await _character.MoveTo(MapContentType.Bank);
-                                await _character.DepositAllItems();
+                            await _character.Recycle(item.Code, amount);
 
-                                // Start again to recheck state of the bank etc
-                                await Recycle();
-                                return;
-                            }
-                            catch (ApiException ex)
-                            {
-                                Console.WriteLine(ex.ErrorContent);
-                            }
+                            // Bank to bank for deposit
+                            await _character.MoveTo(MapContentType.Bank);
+                            await _character.DepositAllItems();
+
+                            // Start again to recheck state of the bank etc
+                            await Recycle();
+                            return;
+                        }
+                        catch (ApiException ex)
+                        {
+                            Console.WriteLine(ex.ErrorContent);
                         }
                     }
                 }
             }
+        }
+
+        private async Task<int> CalculateRecycleQuantity(List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, SimpleItemSchema bankItem)
+        {
+            // If there are 5 of a better item in every way we can recycle all of them, if not we need to keep 5
+            var item = await Items.Instance.GetItem(bankItem.Code);
+
+            // Can it be recycled?
+            if (item.Craft == null ||
+                (item.Craft.Skill != CraftSkill.Gearcrafting &&
+                item.Craft.Skill != CraftSkill.Jewelrycrafting &&
+                item.Craft.Skill != CraftSkill.Weaponcrafting))
+            {
+                return 0;
+            }
+
+            var currentAmount = await CountAmountEverywhere(bankItem.Code, characters, bankItems);
+
+            // Recycle any more than 5
+            if (currentAmount > 5)
+            {
+                Console.WriteLine($"Recycle {currentAmount - 5} {bankItem.Code} because we have {currentAmount} in total");
+                return currentAmount - 5;
+            }
+
+            List<ItemSchema> comparables = new List<ItemSchema>();
+            foreach (var otherBankItem in bankItems)
+            {
+                var comparable = await Items.Instance.GetItem(otherBankItem.Code);
+                if (comparable.Type != item.Type)
+                {
+                    continue;
+                }
+
+                if (comparable.Code == item.Code)
+                {
+                    continue;
+                }
+
+                var bankItemAmount = await CountAmountEverywhere(otherBankItem.Code, characters, bankItems);
+                if (bankItemAmount < 5)
+                {
+                    continue;
+                }
+
+                if (comparable.Effects != null)
+                {
+                    // Are the effects on the comparable better
+                    var better = true;
+                    foreach (var effect in item.Effects)
+                    {
+                        var comparableEffect = comparable.Effects.FirstOrDefault(x => x.Code == effect.Code);
+                        if (comparableEffect == null)
+                        {
+                            better = false;
+                            break;
+                        }
+
+                        if (comparableEffect.Value < effect.Value)
+                        {
+                            better = false;
+                            break;
+                        }
+                    }
+
+                    if (better)
+                    {
+                        // All effects are better on the new item, we can get rid of all this one
+                        Console.WriteLine($"Recycle all {bankItem.Quantity} {bankItem.Code} because we have {bankItemAmount} {comparable.Code} in total");
+                        return bankItem.Quantity;
+                    }
+                }
+            }
+
+            return 0;
         }
     }
 }

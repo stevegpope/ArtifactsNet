@@ -13,15 +13,15 @@
     },
     "baz3": {
       "commandName": "Project",
-      "commandLineArgs": "baz3 craft_specific d d cooked_chicken 2000"
+      "commandLineArgs": "baz3 tasker"
     },
     "baz4": {
       "commandName": "Project",
-      "commandLineArgs": "baz4 crafter"
+      "commandLineArgs": "baz4 tasker"
     },
     "baz5": {
       "commandName": "Project",
-      "commandLineArgs": "baz5 craft_specific dummy dummy cooked_chicken 3000"
+      "commandLineArgs": "baz5 crafter"
     }
   }
 }

@@ -14,6 +14,7 @@ namespace Artifacts
     {
         public static CharacterSchema Details { get; set; }
         public static BankSchema Bank { get; private set; }
+        public static int LastCooldown { get; private set; }
 
         internal static string ToJson<T>(
             this T obj
@@ -31,17 +32,8 @@ namespace Artifacts
         internal static async Task Cooldown(int seconds)
         {
             Console.WriteLine($"Waiting for cooldown: {seconds} seconds");
+            LastCooldown = seconds;
             await Task.Delay(seconds * 1000);
-        }
-
-        internal static async Task Cooldown(DateTimeOffset dateTime)
-        {
-            var remaining = dateTime - DateTimeOffset.UtcNow;
-            var seconds = Math.Max(0, remaining.TotalSeconds);
-
-            Console.WriteLine($"Waiting for cooldown: {seconds:F2} seconds");
-
-            await Task.Delay(TimeSpan.FromSeconds(seconds));
         }
 
         internal static double CalculateManhattanDistance(double x1, double y1, double x2, double y2)
@@ -83,6 +75,13 @@ namespace Artifacts
                 }
 
                 return result;
+            }
+            catch (HttpRequestException ex)
+            {
+                // Network error, wait a minute and try again
+                Console.WriteLine($"Network outage: {ex.Message}");
+                await Task.Delay(60 * 1000);
+                return await ApiCall(call);
             }
             catch (ApiException ex)
             {
