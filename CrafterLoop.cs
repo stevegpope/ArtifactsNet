@@ -25,6 +25,7 @@ namespace Artifacts
                     "weaponcrafting",
                     "gearcrafting",
                     "jewelrycrafting",
+                    "alchemy"
                 ]);
 
                 // Choose a craft skill
@@ -37,6 +38,9 @@ namespace Artifacts
                     case "gearcrafting":
                     case "jewelrycrafting":
                         craftAmount = 1;
+                        break;
+                    case "alchemy":
+                        craftAmount = 5;
                         break;
                     default:
                         throw new Exception($"Unexpected skill {skill}");

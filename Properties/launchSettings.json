@@ -17,7 +17,7 @@
     },
     "baz4": {
       "commandName": "Project",
-      "commandLineArgs": "baz4 tasker"
+      "commandLineArgs": "baz4 crafter"
     },
     "baz5": {
       "commandName": "Project",
