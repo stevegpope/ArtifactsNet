@@ -186,7 +186,7 @@ namespace Artifacts
                         var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: leftToGet * 5);
                         Console.WriteLine($"Crafting {itemsCrafted + 1}/{craftQuantity} {item.Code} for character {Name} ETA: {estimatedTime}");
                         var response = await _api.ActionCraftingMyNameActionCraftingPostAsync(Name, new CraftingSchema(item.Code, 1));
-                        Console.WriteLine($"{Name} Crafted {item.Code}. Xp: {response.Data.Details.Xp}");
+                        Console.WriteLine($"{Name} Xp: {response.Data.Details.Xp}");
                         return response;
                     });
                 }
@@ -215,7 +215,7 @@ namespace Artifacts
                 var gatherQuantity = gatherQuantities[component.Code];
                 while (gatherQuantity > 0)
                 {
-                    var gathered = await GatherItems(component.Code, gatherQuantity, bankOnly, ignoreBank);
+                    var gathered = await GatherItems(component.Code, gatherQuantity, bankOnly: bankOnly, ignoreBank: ignoreBank);
                     Console.WriteLine($"Gathered {gathered}/{gatherQuantities[component.Code]} {component.Code}");
                     if (gathered == 0)
                     {
@@ -244,15 +244,6 @@ namespace Artifacts
                 $"task : {Utils.Details.Task}\n" +
                 $"task type : {Utils.Details.TaskType}\n" +
                 $"task progress : {Utils.Details.TaskProgress}/{Utils.Details.TaskTotal}");
-
-            if (Utils.Details.TaskType == "monsters")
-            {
-                await HandleMonstersTask();
-                await MoveTo(MapContentType.TasksMaster, "monsters");
-                await FinishTask();
-                await MoveTo(MapContentType.TasksMaster, "items");
-                await AcceptNewTask();
-            }
 
             await DoItemTask();
             await MoveTo(MapContentType.Bank);
@@ -304,6 +295,8 @@ namespace Artifacts
 
         private async Task FinishTask()
         {
+            List<SimpleItemSchema> rewards = new List<SimpleItemSchema>();
+
             await Utils.ApiCall(async () =>
             {
                 var result = await _api.ActionCompleteTaskMyNameActionTaskCompletePostAsync(Name);
@@ -313,8 +306,15 @@ namespace Artifacts
                     Console.WriteLine($"drop: {item.Quantity} {item.Code}");
                 }
 
+                rewards = result.Data.Rewards.Items;
+
                 return result;
             });
+
+            if (rewards.Any())
+            {
+                await ConsumeGold(rewards);
+            }
         }
 
         private async Task HandleItemsTask()
@@ -581,9 +581,9 @@ namespace Artifacts
             var bankItemAmount = bankItems.Where(x => x.Code == code).Sum(x => x.Quantity);
             if (bankItemAmount > 0)
             {
+                Console.WriteLine($"{bankItemAmount} {code} in bank, get {total} of them");
                 await MoveTo(MapContentType.Bank);
                 var quantity = Math.Min(total, bankItemAmount);
-                Console.WriteLine($"Found {bankItemAmount} {code} in the bank, going to try and get {quantity} of them");
                 return await WithdrawItems(code, quantity);
             }
 
@@ -662,8 +662,16 @@ namespace Artifacts
             var drops = 0;
             while (drops < remaining)
             {
-                // Assume we are not at the monster
-                await MoveTo(MapContentType.Monster, code: monster);
+                try
+                {
+                    // Assume we are not at the monster
+                    await MoveTo(MapContentType.Monster, code: monster);
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine($"Cannot move to monster {monster}: {ex.Message}");
+                    return drops;
+                }
 
                 // If we are healthy enough fight right away
                 var needsRest = Utils.Details.Hp < Utils.Details.MaxHp * .5;
@@ -1049,14 +1057,16 @@ namespace Artifacts
             return 0;
         }
 
-        private async Task<bool> ConsumeGold(ItemSchema item, int quantity)
+        private async Task ConsumeGold(List<SimpleItemSchema> items)
         {
-            if (item.Type == "consumable" && item.Subtype == "bag")
+            foreach (var simpleItem in items)
             {
-                return await Consume(item.Code, quantity) > 0;
+                var item = await Items.Instance.GetItem(simpleItem.Code);
+                if (item.Type == "consumable" && item.Subtype == "bag")
+                {
+                    await Consume(item.Code, simpleItem.Quantity);
+                }
             }
-
-            return false;
         }
 
         private async Task<CharacterFightResponseSchema> Fight()
@@ -1261,7 +1271,7 @@ namespace Artifacts
                         var amount = Math.Min(space, bankItem.Quantity);
 
                         // Don't be greedy
-                        amount = Math.Min(amount, 20);
+                        amount = Math.Min(amount, 50);
 
                         await MoveTo(MapContentType.Bank);
 

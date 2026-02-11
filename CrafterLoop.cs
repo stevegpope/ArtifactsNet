@@ -163,6 +163,11 @@ namespace Artifacts
             if (total == 0)
             {
                 Console.WriteLine($"Already have enough items at this level, crafting without bank check");
+
+                // Remove anything that requires a task item
+                var taskItems = await Items.Instance.GetTaskItems();
+                var newItems = items.Where(x => !taskItems.Any(i => i.Code == x.Code)).ToList();
+
                 return await CraftItemsAtLevel(targetLevel, craftAmount, items, bankItems, ignoreBankCheck: true);
             }
 
@@ -210,7 +215,8 @@ namespace Artifacts
 
                 if (recycleQuantity > 0)
                 {
-                    var amount = await _character.WithdrawItems(bankItem.Code, recycleQuantity);
+                    // We withdraw all items so that no other characters can do it. Race condition avoidance!
+                    var amount = await _character.WithdrawItems(bankItem.Code);
                     if (amount > 0)
                     {
                         try
@@ -220,7 +226,17 @@ namespace Artifacts
                             // Go to relevant workshop
                             await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
 
-                            await _character.Recycle(item.Code, amount);
+                            // Double check
+                            recycleQuantity = await CalculateRecycleQuantity(bankItems, characters, bankItem);
+                            if (recycleQuantity <= 0)
+                            {
+                                Console.WriteLine($"Last minute recycle changed our mind.");
+                            }
+                            else
+                            {
+                                recycleQuantity = Math.Min(recycleQuantity, amount);
+                                await _character.Recycle(item.Code, recycleQuantity);
+                            }
 
                             // Bank to bank for deposit
                             await _character.MoveTo(MapContentType.Bank);

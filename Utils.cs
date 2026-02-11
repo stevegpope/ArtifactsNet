@@ -98,7 +98,7 @@ namespace Artifacts
                 }
                 else if (ex.ErrorCode == 486)
                 {
-                    Console.WriteLine($"An action is already in progress. Try again??");
+                    // An action is already in progress. Try again
                     return await ApiCall(call);
                 }
 

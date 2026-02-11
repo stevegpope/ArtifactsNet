@@ -1,7 +1,6 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
-using System.Threading.Tasks;
 
 namespace Artifacts
 {
@@ -259,7 +258,7 @@ namespace Artifacts
                 value += item.Effects.Where(e => e.Code == boost_water).Sum(e => e.Value) * estimatedRounds;
             }
 
-            Console.WriteLine($"{item.Code} has value {value} against monster {monster.Code}");
+            Console.WriteLine($"{item.Code} {value} against {monster.Code}");
             return value;
         }
 
