@@ -107,7 +107,7 @@ namespace Artifacts
             }
         }
 
-        internal bool IsBetterItem(ItemSchema bestItem, ItemSchema item, MonsterSchema monster)
+        internal bool IsBetterItem(ItemSchema bestItem, ItemSchema item, MonsterSchema monster, ItemSchema weapon)
         {
             // Optimization
             if (bestItem != null && item != null && bestItem.Code == item.Code)
@@ -115,13 +115,13 @@ namespace Artifacts
                 return false;
             }
 
-            var item1Value = CalculateItemValue(bestItem, monster);
-            var item2Value = CalculateItemValue(item, monster);
+            var item1Value = CalculateItemValue(bestItem, monster, weapon);
+            var item2Value = CalculateItemValue(item, monster, weapon);
 
             return item2Value > item1Value;
         }
 
-        internal double CalculateItemValue(ItemSchema item, MonsterSchema monster)
+        internal double CalculateItemValue(ItemSchema item, MonsterSchema monster, ItemSchema weapon)
         {
             if (item.Effects == null || item.Effects.Count == 0)
             {
@@ -140,7 +140,7 @@ namespace Artifacts
 
             foreach (var effect in item.Effects)
             {
-                switch(effect.Code)
+                switch (effect.Code)
                 {
                     case "hp":
                     case "boost_hp":
@@ -160,105 +160,105 @@ namespace Artifacts
                     case "attack_fire":
                     case "heal":
                     case "restore":
-                    case "boost_dmg_earth":
-                    case "boost_dmg_water":
-                    case "boost_dmg_fire":
-                    case "boost_dmg_air":
                         value += effect.Value * estimatedRounds;
                         break;
+                }
 
+                value += AddBoost(weapon, estimatedRounds, effect);
+
+                // Specific elements count twice
+                if (monster.AttackAir > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == "res_air").Sum(e => e.Value) * estimatedRounds;
+                }
+                if (monster.AttackEarth > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == "res_earth").Sum(e => e.Value) * estimatedRounds;
+                }
+                if (monster.AttackFire > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == "res_fire").Sum(e => e.Value) * estimatedRounds;
+                }
+                if (monster.AttackWater > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == "res_water").Sum(e => e.Value) * estimatedRounds;
+                }
+
+                const string atk_air = "attack_air";
+                const string atk_earth = "attack_earth";
+                const string atk_fire = "attack_fire";
+                const string atk_water = "attack_water";
+
+                // We will double the damage calculation for elements other than the ones they resist
+                if (monster.ResAir > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
+                }
+                else if (monster.ResAir < 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
+                }
+
+                if (monster.ResEarth > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
+                }
+                else if (monster.ResEarth < 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
+                }
+
+                if (monster.ResFire > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
+                }
+                else if (monster.ResFire < 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
+                }
+
+                if (monster.ResWater > 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
+                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
+                }
+                else if (monster.ResWater < 0)
+                {
+                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
                 }
             }
 
-            // Specific elements count twice
-            if (monster.AttackAir > 0)
-            {
-                value += item.Effects.Where(e => e.Code == "res_air").Sum(e => e.Value) * estimatedRounds;
-            }
-            if (monster.AttackEarth > 0)
-            {
-                value += item.Effects.Where(e => e.Code == "res_earth").Sum(e => e.Value) * estimatedRounds;
-            }
-            if (monster.AttackFire > 0)
-            {
-                value += item.Effects.Where(e => e.Code == "res_fire").Sum(e => e.Value) * estimatedRounds;
-            }
-            if (monster.AttackWater > 0)
-            {
-                value += item.Effects.Where(e => e.Code == "res_water").Sum(e => e.Value) * estimatedRounds;
-            }
-
-            const string atk_air = "attack_air";
-            const string atk_earth = "attack_earth";
-            const string atk_fire = "attack_fire";
-            const string atk_water = "attack_water";
-            const string boost_air = "boost_dmg_air";
-            const string boost_earth = "boost_dmg_earth";
-            const string boost_fire = "boost_dmg_fire";
-            const string boost_water = "boost_dmg_water";
-
-            // We will double the damage calculation for elements other than the ones they resist
-            if (monster.ResAir > 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_earth).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_fire).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_water).Sum(e => e.Value) * estimatedRounds;
-            }
-            else if (monster.ResAir < 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_air).Sum(e => e.Value) * estimatedRounds;
-            }
-
-            if (monster.ResEarth > 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_air).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_fire).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_water).Sum(e => e.Value) * estimatedRounds;
-            }
-            else if (monster.ResEarth < 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_earth).Sum(e => e.Value) * estimatedRounds;
-            }
-
-            if (monster.ResFire > 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_earth).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_air).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_water).Sum(e => e.Value) * estimatedRounds;
-            }
-            else if (monster.ResFire < 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_fire).Sum(e => e.Value) * estimatedRounds;
-            }
-
-            if (monster.ResWater > 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_earth).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_fire).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_air).Sum(e => e.Value) * estimatedRounds;
-            }
-            else if (monster.ResWater < 0)
-            {
-                value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                value += item.Effects.Where(e => e.Code == boost_water).Sum(e => e.Value) * estimatedRounds;
-            }
-
             Console.WriteLine($"{item.Code} {value} against {monster.Code}");
+            return value;
+        }
+
+        private static double AddBoost(ItemSchema weapon, int estimatedRounds, SimpleEffectSchema effect)
+        {
+            var value = 0.0;
+
+            if (weapon != null && effect.Code.StartsWith("boost_"))
+            {
+                var element = effect.Code.Substring(effect.Code.LastIndexOf('_') + 1);
+                foreach (var weaponEffect in weapon.Effects)
+                {
+                    if (weaponEffect.Code.StartsWith("attack") || weaponEffect.Code.StartsWith("dmg_"))
+                    {
+                        var weaponElement = effect.Code.Substring(effect.Code.LastIndexOf('_') + 1);
+                        if (weaponElement == element)
+                        {
+                            value += effect.Value * estimatedRounds;
+                        }
+                    }
+                }
+            }
+
             return value;
         }
 

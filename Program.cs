@@ -44,6 +44,8 @@ namespace Artifacts
             
             Map.Config(configuration, httpClient);
             Items.Config(configuration, httpClient);
+            Events.Config(configuration, httpClient);
+            Npcs.Config(configuration, httpClient);
             Resources.Config(configuration, httpClient);
             Monsters.Config(configuration, httpClient);
             Bank.Config(configuration, httpClient);

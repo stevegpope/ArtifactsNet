@@ -48,7 +48,7 @@ namespace ArtifactsMmoClient.Model
         /// <param name="currency">Currency used to buy/sell the item. If it&#39;s not gold, it&#39;s the item code. (required).</param>
         /// <param name="buyPrice">Price to buy the item..</param>
         /// <param name="sellPrice">Price to sell the item..</param>
-        public NPCItem(string code = default, string npc = default, string currency = default, int buyPrice = default, int sellPrice = default)
+        public NPCItem(string code = default, string npc = default, string currency = default, int? buyPrice = default, int? sellPrice = default)
         {
             // to ensure "code" is required (not null)
             if (code == null)
@@ -99,14 +99,14 @@ namespace ArtifactsMmoClient.Model
         /// </summary>
         /// <value>Price to buy the item.</value>
         [DataMember(Name = "buy_price", EmitDefaultValue = false)]
-        public int BuyPrice { get; set; }
+        public int? BuyPrice { get; set; }
 
         /// <summary>
         /// Price to sell the item.
         /// </summary>
         /// <value>Price to sell the item.</value>
         [DataMember(Name = "sell_price", EmitDefaultValue = false)]
-        public int SellPrice { get; set; }
+        public int? SellPrice { get; set; }
 
         /// <summary>
         /// Gets or Sets additional properties

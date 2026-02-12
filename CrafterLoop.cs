@@ -18,6 +18,7 @@ namespace Artifacts
         internal async Task RunAsync()
         {
             Console.WriteLine($"Starting crafter loop");
+            await ProcessEvents();
 
             while (true)
             {
@@ -68,6 +69,50 @@ namespace Artifacts
 
                 // Recycle leftovers
                 await Recycle();
+            }
+        }
+
+        private async Task ProcessEvents()
+        {
+            var events = await Events.Instance.GetActiveEvents();
+            foreach (var activeEvent in events)
+            {
+                if (activeEvent.Expiration < DateTime.UtcNow + TimeSpan.FromSeconds(240))
+                {
+                    Console.WriteLine($"Event {activeEvent.Code} expires too soon {activeEvent.Expiration}");
+                    continue;
+                }
+
+                if (activeEvent.Code.EndsWith("_merchant"))
+                {
+                    await ProcessMerchant(activeEvent);
+                }
+            }
+        }
+
+        private async Task ProcessMerchant(ActiveEventSchema activeEvent)
+        {
+            var items = await Npcs.Instance.GetNpcItems(activeEvent.Code);
+            var bankItems = await Bank.Instance.GetItems();
+            foreach (var item in items)
+            {
+                if (item.SellPrice == null || item.SellPrice < 10)
+                {
+                    continue;
+                }
+
+                var bankItem = bankItems.FirstOrDefault(x => x.Code == item.Code);
+                if (bankItem != null)
+                {
+                    await _character.MoveTo(MapContentType.Bank);
+                    var withdrawn = await _character.WithdrawItems(bankItem.Code);
+                    if (withdrawn > 0)
+                    {
+                        Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
+                        await _character.Move(activeEvent.Map.X, activeEvent.Map.Y);
+                        await _character.SellNpc(bankItem.Code, withdrawn);
+                    }
+                }
             }
         }
 
@@ -166,9 +211,9 @@ namespace Artifacts
 
                 // Remove anything that requires a task item
                 var taskItems = await Items.Instance.GetTaskItems();
-                var newItems = items.Where(x => !taskItems.Any(i => i.Code == x.Code)).ToList();
+                var newItems = items.Where(x => !x.Craft.Items.Any(c => taskItems.Any(i => i.Code == c.Code))).ToList();
 
-                return await CraftItemsAtLevel(targetLevel, craftAmount, items, bankItems, ignoreBankCheck: true);
+                return await CraftItemsAtLevel(targetLevel, craftAmount, newItems, bankItems, ignoreBankCheck: true);
             }
 
             return total;

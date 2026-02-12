@@ -165,7 +165,8 @@ namespace Artifacts
 
             var gatherQuantities = CalculateGatherQuantities(item.Craft, craftQuantity);
 
-            if (!await FetchCraftingItems(item, gatherQuantities, bankOnly, ignoreBank))
+            var found = await FetchCraftingItems(item, gatherQuantities, bankOnly, ignoreBank);
+            if (found == 0)
             {
                 await PerformTask();
                 return 0;
@@ -207,27 +208,30 @@ namespace Artifacts
             return itemsCrafted;
         }
 
-        private async Task<bool> FetchCraftingItems(ItemSchema item, Dictionary<string, int> gatherQuantities, bool bankOnly, bool ignoreBank)
+        private async Task<int> FetchCraftingItems(ItemSchema item, Dictionary<string, int> gatherQuantities, bool bankOnly, bool ignoreBank)
         {
             // Get the items required for crafting
+            var gathered = 0;
             foreach (var component in item.Craft.Items)
             {
+                var componentQuantity = 0;
                 var gatherQuantity = gatherQuantities[component.Code];
-                while (gatherQuantity > 0)
+                while (componentQuantity < gatherQuantity)
                 {
-                    var gathered = await GatherItems(component.Code, gatherQuantity, bankOnly: bankOnly, ignoreBank: ignoreBank);
-                    Console.WriteLine($"Gathered {gathered}/{gatherQuantities[component.Code]} {component.Code}");
-                    if (gathered == 0)
-                    {
-                        Console.WriteLine($"We cannot gather {component.Code}!");
-                        return false;
-                    }
+                    var current = await GatherItems(component.Code, gatherQuantity, bankOnly: bankOnly, ignoreBank: ignoreBank);
+                    gathered += current;
+                    componentQuantity += current;
 
-                    gatherQuantity -= gathered;
+                    Console.WriteLine($"Gathered {componentQuantity}/{gatherQuantity} {component.Code}");
+                    if (current == 0)
+                    {
+                        Console.WriteLine($"We cannot gather any more {component.Code}!");
+                        return gathered;
+                    }
                 }
             }
 
-            return true;
+            return gathered;
         }
 
         private async Task PerformTask()
@@ -654,7 +658,7 @@ namespace Artifacts
 
         private async Task<int> FightDrops(string monster, string code, int remaining)
         {
-            await GearUp(monster);
+            await GearUpMonster(monster);
 
             var lostLastFight = 0;
             var losses = 0;
@@ -923,7 +927,7 @@ namespace Artifacts
             var monstersKilled = 0;
             var lostLastFight = 0;
 
-            await GearUp(monster);
+            await GearUpMonster(monster);
 
             while(monstersKilled < total)
             {
@@ -1226,7 +1230,7 @@ namespace Artifacts
             return bestItem;
         }
 
-        private async Task GearUp(string monsterCode)
+        private async Task GearUpMonster(string monsterCode)
         {
             if (monsterCode == null)
             {
@@ -1235,8 +1239,11 @@ namespace Artifacts
 
             var monster = await Monsters.Instance.GetMonster(monsterCode);
             var bankItems = await Bank.Instance.GetItems();
-            await EquipBestForMonster(Utils.Details.WeaponSlot, ItemSlot.Weapon, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.ShieldSlot, ItemSlot.Shield, monster, bankItems);
+
+            // The damage bonuses of supplementary equipment do not count if the weapon does not have the damage type
+            var weapon = await EquipBestForMonster(Utils.Details.WeaponSlot, ItemSlot.Weapon, monster, bankItems);
+
+            await EquipBestForMonster(Utils.Details.ShieldSlot, ItemSlot.Shield, monster, bankItems, weapon);
             await EquipBestForMonster(Utils.Details.HelmetSlot, ItemSlot.Helmet, monster, bankItems);
             await EquipBestForMonster(Utils.Details.BodyArmorSlot, ItemSlot.BodyArmor, monster, bankItems);
             await EquipBestForMonster(Utils.Details.LegArmorSlot, ItemSlot.LegArmor, monster, bankItems);
@@ -1259,6 +1266,11 @@ namespace Artifacts
         {
             // Save a little room, just in case of item swaps
             var space = GetFreeInventorySpace() - 10;
+            if (space <= 0)
+            {
+                Console.WriteLine("No room for food!");
+                return;
+            }
 
             var found = false;
             foreach (var bankItem in bankItems)
@@ -1346,27 +1358,30 @@ namespace Artifacts
             }
         }
 
-        private async Task EquipBestForMonster(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems)
+        private async Task<ItemSchema> EquipBestForMonster(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon = null)
         {
             ItemSchema currentItem = null;
             var currentValue = 0.0;
             if (!string.IsNullOrEmpty(currentEquipped))
             {
                 currentItem = await Items.Instance.GetItem(currentEquipped);
-                currentValue = Items.Instance.CalculateItemValue(currentItem, monster);
+                currentValue = Items.Instance.CalculateItemValue(currentItem, monster, weapon);
             }
 
-            var bestInventoryItem = await GetBestItemFromInventory(slotType, monster);
-            var inventoryValue = bestInventoryItem != null ? Items.Instance.CalculateItemValue(bestInventoryItem, monster) : 0;
+            var bestInventoryItem = await GetBestItemFromInventory(slotType, monster, weapon);
+            var inventoryValue = bestInventoryItem != null ? Items.Instance.CalculateItemValue(bestInventoryItem, monster, weapon) : 0;
 
-            var bestBankItem = await GetBestItemFromBank(slotType, monster, bankItems);
-            var bankValue = bestBankItem != null ? Items.Instance.CalculateItemValue(bestBankItem, monster) : 0;
+            var bestBankItem = await GetBestItemFromBank(slotType, monster, bankItems, weapon);
+            var bankValue = bestBankItem != null ? Items.Instance.CalculateItemValue(bestBankItem, monster, weapon) : 0;
 
             var max = Math.Max(currentValue, Math.Max(bankValue, inventoryValue));
+            Console.WriteLine($"Equipped {currentValue}, inventory {inventoryValue}, bank {bankValue}");
+
             if (max == currentValue)
             {
                 // Nothing to change
-                return;
+                Console.WriteLine($"Keep equipped {currentItem?.Code}");
+                return currentItem;
             }
 
             if (max == inventoryValue)
@@ -1378,6 +1393,7 @@ namespace Artifacts
                 }
 
                 await Equip(bestInventoryItem.Code, slotType);
+                return bestInventoryItem;
             }
             else
             {
@@ -1401,10 +1417,12 @@ namespace Artifacts
 
                     await Equip(bestBankItem.Code, slotType, withdrawn);
                 }
+
+                return bestBankItem;
             }
         }
 
-        private async Task<ItemSchema> GetBestItemFromBank(ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems)
+        private async Task<ItemSchema> GetBestItemFromBank(ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon)
         {
             ItemSchema bestItem = null;
             foreach (var bankItem in bankItems)
@@ -1428,7 +1446,7 @@ namespace Artifacts
                     {
                         bestItem = item;
                     }
-                    else if (Items.Instance.IsBetterItem(bestItem, item, monster))
+                    else if (Items.Instance.IsBetterItem(bestItem, item, monster, weapon))
                     {
                         bestItem = item;
                     }
@@ -1438,7 +1456,7 @@ namespace Artifacts
             return bestItem;
         }
 
-        private static async Task<ItemSchema> GetBestItemFromInventory(ItemSlot slotType, MonsterSchema monster)
+        private static async Task<ItemSchema> GetBestItemFromInventory(ItemSlot slotType, MonsterSchema monster, ItemSchema weapon)
         {
             ItemSchema bestItem = null;
             foreach (var inventoryItem in Utils.Details.Inventory)
@@ -1472,7 +1490,7 @@ namespace Artifacts
                     {
                         bestItem = item;
                     }
-                    else if (Items.Instance.IsBetterItem(bestItem, item, monster))
+                    else if (Items.Instance.IsBetterItem(bestItem, item, monster, weapon))
                     {
                         bestItem = item;
                     }
@@ -1595,6 +1613,22 @@ namespace Artifacts
             {
                 return await _api.ActionRecyclingMyNameActionRecyclingPostAsync(Name, new RecyclingSchema(code, recycleQuantity));
             });
+        }
+
+        internal async Task SellNpc(string code, int quantity)
+        {
+            try
+            {
+                Console.WriteLine($"Selling {quantity} {code}");
+                await Utils.ApiCall(async () =>
+                {
+                    return await _api.ActionNpcSellItemMyNameActionNpcSellPostAsync(Name, new NpcMerchantBuySchema(code, quantity));
+                });
+            }
+            catch (ApiException ex)
+            {
+                Console.WriteLine(ex.ErrorContent);
+            }
         }
     }
 }
