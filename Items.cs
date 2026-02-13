@@ -147,13 +147,10 @@ namespace Artifacts
                     case "threat":
                     case "inventory_space":
                     case "critical_strike":
+                    case "wisdom":
                         value += effect.Value;
                         break;
                     case "dmg":
-                    case "dmg_earth":
-                    case "dmg_water":
-                    case "dmg_air":
-                    case "dmg_fire":
                     case "attack_earth":
                     case "attack_water":
                     case "attack_air":
@@ -243,7 +240,7 @@ namespace Artifacts
         {
             var value = 0.0;
 
-            if (weapon != null && effect.Code.StartsWith("boost_"))
+            if (weapon != null && (effect.Code.StartsWith("boost_") || effect.Code.StartsWith("dmg_")))
             {
                 var element = effect.Code.Substring(effect.Code.LastIndexOf('_') + 1);
                 foreach (var weaponEffect in weapon.Effects)
@@ -330,6 +327,7 @@ namespace Artifacts
             {
                 // These effects have negative values!
                 if (effect.Code == skill) { value -= effect.Value; }
+                if (effect.Code == "wisdom") { value += effect.Value; }
             }
 
             return value;

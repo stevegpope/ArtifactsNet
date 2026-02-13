@@ -46,9 +46,9 @@ namespace Artifacts
             return mapSchema as DataPageMapSchema;
         }
 
-        internal async Task<MapSchema> GetMapPosition(int x, int y)
+        internal async Task<MapSchema> GetMapPosition(int x, int y, MapLayer layer = MapLayer.Overworld)
         {
-            var mapResponseSchema = await Utils.ApiCall(async () => await _api.GetMapByPositionMapsLayerXYGetAsync(MapLayer.Overworld, x, y));
+            var mapResponseSchema = await Utils.ApiCall(async () => await _api.GetMapByPositionMapsLayerXYGetAsync(layer, x, y));
             return (mapResponseSchema as MapResponseSchema).Data;
         }
     }

@@ -2,6 +2,7 @@
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
 using Microsoft.Extensions.Logging;
+using System.Xml.Linq;
 
 namespace Artifacts
 {
@@ -40,7 +41,13 @@ namespace Artifacts
 
         internal async Task<CharacterSchema> GetDetailsAsync(string name)
         {
-            var result = await _charactersApi.GetCharacterCharactersNameGetAsync(name);
+            var result = await Utils.ApiCall(async () => await _charactersApi.GetCharacterCharactersNameGetAsync(name)) as CharacterResponseSchema;
+            return result.Data;
+        }
+
+        internal async Task<List<ActiveCharacterSchema>> GetCharacters()
+        {
+            var result = await Utils.ApiCall(async () => await _charactersApi.GetActiveCharactersCharactersActiveGetAsync()) as DataPageActiveCharacterSchema;
             return result.Data;
         }
     }

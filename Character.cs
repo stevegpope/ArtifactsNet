@@ -3,6 +3,7 @@ using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System;
+using System.Net.WebSockets;
 
 namespace Artifacts
 {
@@ -691,6 +692,7 @@ namespace Artifacts
         private async Task<int> FightDrops(string monster, string code, int remaining)
         {
             await GearUpMonster(monster);
+            var monsterSchema = await Monsters.Instance.GetMonster(monster);
 
             var lostLastFight = 0;
             var losses = 0;
@@ -716,10 +718,18 @@ namespace Artifacts
                     await Rest();
                 }
 
+                // If this is a boss fight we will wait until there are 3 characters present before we fight.
+                // While checking for events, we also check to see if any characters are waiting at a boss.
+                List<string> participants = null;
+                if (monsterSchema.Type == MonsterType.Boss)
+                {
+                    participants = await WaitForBackup();
+                }
+
                 try
                 {
                     var hp = Utils.Details.Hp;
-                    var result = await Fight();
+                    var result = await Fight(participants);
                     lostLastFight = hp - Utils.Details.Hp;
                     if (result.Data.Fight.Result == FightResult.Loss)
                     {
@@ -764,6 +774,41 @@ namespace Artifacts
             }
 
             return drops;
+        }
+
+        private async Task<List<string>> WaitForBackup()
+        {
+            var participants = new HashSet<string>();
+            while(true)
+            {
+                var characters = await Characters.Instance.GetCharacters();
+                foreach (var character in characters)
+                {
+                    if (character.Name == Utils.Details.Name)
+                    {
+                        continue;
+                    }
+
+                    if (character.X == Utils.Details.X &&
+                        character.Y == Utils.Details.Y &&
+                        character.Layer == Utils.Details.Layer)
+                    {
+                        participants.Add(character.Name);
+                    }
+                    else
+                    {
+                        participants.Remove(character.Name);
+                    }
+
+                    if (participants.Count >= 3)
+                    {
+                        return participants.Take(3).ToList();
+                    }
+                }
+
+                Console.WriteLine($"Waiting 10s for 3 participants for boss: {string.Join(',', participants)}");
+                await Task.Delay(10000);
+            }
         }
 
         internal async Task DepositAllItems()
@@ -1036,7 +1081,7 @@ namespace Artifacts
             }
         }
 
-        private async Task Rest()
+        internal async Task Rest()
         {
             if (await EatSomething())
             {
@@ -1136,13 +1181,13 @@ namespace Artifacts
             }
         }
 
-        private async Task<CharacterFightResponseSchema> Fight()
+        private async Task<CharacterFightResponseSchema> Fight(List<string> participants = null)
         {
             Console.WriteLine("Fight!!");
 
             var result = await Utils.ApiCall(async () =>
             {
-                var response = await _api.ActionFightMyNameActionFightPostAsync(Name);
+                var response = await _api.ActionFightMyNameActionFightPostAsync(Name, new FightRequestSchema(participants));
                 Console.WriteLine($"Fight {response.Data.Fight.Result}!!!");
                 foreach (var characterResponse in response.Data.Fight.Characters)
                 {
@@ -1293,7 +1338,7 @@ namespace Artifacts
             return bestItem;
         }
 
-        private async Task GearUpMonster(string monsterCode)
+        internal async Task GearUpMonster(string monsterCode)
         {
             if (monsterCode == null)
             {
