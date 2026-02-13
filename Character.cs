@@ -175,6 +175,9 @@ namespace Artifacts
                 return 0;
             }
 
+            // Gear up for prospecting to get more xp
+            await GearUpSkill(null, null);
+
             // Go to the crafting location
             await MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
 
@@ -1209,6 +1212,8 @@ namespace Artifacts
 
         private async Task GearUpSkill(string skill, ItemSchema doNotUse)
         {
+            Console.WriteLine($"Gear up for {skill}");
+
             if (skill == null)
             {
                 return;

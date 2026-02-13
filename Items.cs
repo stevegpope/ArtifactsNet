@@ -148,6 +148,9 @@ namespace Artifacts
                     case "inventory_space":
                     case "critical_strike":
                     case "wisdom":
+                    case "prospecting":
+                    case "haste":
+                    case "initative":
                         value += effect.Value;
                         break;
                     case "dmg":
@@ -328,6 +331,7 @@ namespace Artifacts
                 // These effects have negative values!
                 if (effect.Code == skill) { value -= effect.Value; }
                 if (effect.Code == "wisdom") { value += effect.Value; }
+                if (effect.Code == "prospecting") { value += effect.Value; }
             }
 
             return value;
