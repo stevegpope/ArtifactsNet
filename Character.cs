@@ -1,6 +1,8 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using System;
 
 namespace Artifacts
 {
@@ -211,9 +213,17 @@ namespace Artifacts
         private async Task<int> FetchCraftingItems(ItemSchema item, Dictionary<string, int> gatherQuantities, bool bankOnly, bool ignoreBank)
         {
             // Get the items required for crafting
+            var index = 0;
             var gathered = 0;
             foreach (var component in item.Craft.Items)
             {
+                if (index > 0)
+                {
+                    await DropOffNonComponents(item);
+                }
+
+                index++;
+
                 var componentQuantity = 0;
                 var gatherQuantity = gatherQuantities[component.Code];
                 while (componentQuantity < gatherQuantity)
@@ -234,6 +244,28 @@ namespace Artifacts
             return gathered;
         }
 
+        private async Task DropOffNonComponents(ItemSchema item)
+        {
+            var itemsToExclude = new HashSet<string>();
+            AddComponents(item, ref itemsToExclude);
+
+            await DepositExcept(itemsToExclude.ToList());
+        }
+
+        private void AddComponents(ItemSchema item, ref HashSet<string> components)
+        {
+            components.Add(item.Code);
+
+            if (item.Craft != null)
+            {
+                foreach (var craftItem in item.Craft.Items)
+                {
+                    var craft = Items.Instance.GetItem(craftItem.Code);
+                    AddComponents(craft, ref components);
+                }
+            }
+        }
+
         private async Task PerformTask()
         {
             await ExchangeCoins();
@@ -242,7 +274,7 @@ namespace Artifacts
             {
                 // Go to task master
                 await AcceptNewTask();
-            }
+            };
 
             Console.WriteLine($"Current task:\n + " +
                 $"task : {Utils.Details.Task}\n" +
@@ -344,7 +376,7 @@ namespace Artifacts
                     // Go gather, craft, or hunt down the item
                     Console.WriteLine($"Fetching item {Utils.Details.Task}");
 
-                    var item = await Items.Instance.GetItem(Utils.Details.Task);
+                    var item = Items.Instance.GetItem(Utils.Details.Task);
                     var perItemInventorySpace = 1;
                     if (item.Craft != null)
                     {
@@ -482,7 +514,7 @@ namespace Artifacts
 
             var remaining = total - withdrawn;
 
-            var item = await Items.Instance.GetItem(code);
+            var item = Items.Instance.GetItem(code);
             if (item.Craft != null)
             {
                 Console.WriteLine($"Need to craft {code}");
@@ -721,6 +753,8 @@ namespace Artifacts
                     if (ex.ErrorCode == 497)
                     {
                         Console.WriteLine("Inventory full, cannot fight");
+                        await MoveTo(MapContentType.Bank);
+                        await DepositExcept(new List<string>([code]));
                         break;
                     }
 
@@ -793,7 +827,7 @@ namespace Artifacts
                 Console.WriteLine($"{Name} buying bank expansion for {bankDetails.NextExpansionCost}");
                 await Utils.ApiCall(async () =>
                 {
-                    return _api.ActionBuyBankExpansionMyNameActionBankBuyExpansionPostAsync(Name);
+                    return await _api.ActionBuyBankExpansionMyNameActionBankBuyExpansionPostAsync(Name);
                 });
 
                 bankDetails = await Bank.Instance.GetBankDetails();
@@ -811,6 +845,7 @@ namespace Artifacts
             {
                 if (!string.IsNullOrEmpty(item.Code) && !excludeCodes.Contains(item.Code, StringComparer.OrdinalIgnoreCase))
                 {
+                    Console.WriteLine($"Deposit {item.Quantity} {item.Code}");
                     items.Add(new SimpleItemSchema(item.Code, item.Quantity));
                 }
             }
@@ -821,11 +856,20 @@ namespace Artifacts
                 return;
             }
 
-            await Utils.ApiCall(async () =>
+            await MoveTo(MapContentType.Bank);
+
+            try
             {
-                var response = await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
-                return response;
-            });
+                await Utils.ApiCall(async () =>
+                {
+                    var response = await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
+                    return response;
+                });
+            }
+            catch (ApiException ex)
+            {
+                Console.WriteLine($"Deposit error: {ex.ErrorContent}"); 
+            }
         }
 
         internal async Task DepositGold()
@@ -834,6 +878,8 @@ namespace Artifacts
             {
                 return;
             }
+
+            await MoveTo(MapContentType.Bank);
 
             await Utils.ApiCall(async () =>
             {
@@ -866,10 +912,10 @@ namespace Artifacts
 
         internal async Task<int> WithdrawItems(string code, int quantity = 0)
         {
-            Console.WriteLine($"Customer wants to withdraw {quantity} {code}");
+            var inventorySpace = GetFreeInventorySpace();
+            Console.WriteLine($"Customer wants to withdraw {quantity} {code}. Free space {inventorySpace}");
 
             var bankItems = await Bank.Instance.GetItems();
-            var inventorySpace = GetFreeInventorySpace();
 
             var bankItem = bankItems.FirstOrDefault(b => b.Code == code);
             if (bankItem == null)
@@ -891,7 +937,8 @@ namespace Artifacts
             Console.WriteLine($"Try to withdraw {withdrawQuantity} {code}, inventory space {inventorySpace}");
             if (withdrawQuantity <= 0)
             {
-                throw new Exception($"Invalid quantity {withdrawQuantity}");
+                Console.WriteLine($"Invalid quantity {withdrawQuantity}");
+                return 0;
             }
 
             try
@@ -926,6 +973,7 @@ namespace Artifacts
         {
             var monstersKilled = 0;
             var lostLastFight = 0;
+            var losses = 0;
 
             await GearUpMonster(monster);
 
@@ -958,6 +1006,19 @@ namespace Artifacts
                     if (result.Data.Fight.Result == FightResult.Win)
                     {
                         monstersKilled++;
+                        // Reset losses, we can beat him!
+                        losses = 0;
+                    }
+                    else if (result.Data.Fight.Result == FightResult.Loss)
+                    {
+                        const int Limit = 3;
+                        losses++;
+                        Console.WriteLine($"loss {losses}/{Limit}");
+                        if (losses >= Limit)
+                        {
+                            Console.WriteLine($"We Lost! Giving up on monster {monster}");
+                            return;
+                        }
                     }
                 }
                 catch (ApiException ex)
@@ -969,6 +1030,8 @@ namespace Artifacts
                         await MoveTo(MapContentType.Bank);
                         await DepositAllItems();
                     }
+
+                    return;
                 }
             }
         }
@@ -1008,7 +1071,7 @@ namespace Artifacts
                     continue;
                 }
 
-                var item = await Items.Instance.GetItem(inventoryItem.Code);
+                var item = Items.Instance.GetItem(inventoryItem.Code);
                 if (item.Type == "consumable")
                 {
                     var heal = item.Effects.Where(x => x.Code == "heal").Sum(x => x.Value);
@@ -1065,7 +1128,7 @@ namespace Artifacts
         {
             foreach (var simpleItem in items)
             {
-                var item = await Items.Instance.GetItem(simpleItem.Code);
+                var item = Items.Instance.GetItem(simpleItem.Code);
                 if (item.Type == "consumable" && item.Subtype == "bag")
                 {
                     await Consume(item.Code, simpleItem.Quantity);
@@ -1131,7 +1194,7 @@ namespace Artifacts
             var currentValue = 0.0;
             if (!string.IsNullOrEmpty(currentEquipped))
             {
-                currentItem = await Items.Instance.GetItem(currentEquipped);
+                currentItem = Items.Instance.GetItem(currentEquipped);
                 currentValue = Items.Instance.CalculateItemValueSkill(currentItem, skill);
             }
 
@@ -1181,7 +1244,7 @@ namespace Artifacts
                     continue;
                 }
 
-                var item = await Items.Instance.GetItem(bankItem.Code);
+                var item = Items.Instance.GetItem(bankItem.Code);
                 if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
                 {
                     if (bestItem == null)
@@ -1213,7 +1276,7 @@ namespace Artifacts
                     continue;
                 }
 
-                var item = await Items.Instance.GetItem(inventoryItem.Code);
+                var item = Items.Instance.GetItem(inventoryItem.Code);
                 if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
                 {
                     if (bestItem == null)
@@ -1241,31 +1304,31 @@ namespace Artifacts
             var bankItems = await Bank.Instance.GetItems();
 
             // The damage bonuses of supplementary equipment do not count if the weapon does not have the damage type
-            var weapon = await EquipBestForMonster(Utils.Details.WeaponSlot, ItemSlot.Weapon, monster, bankItems);
+            var weapon = await EquipBestForMonster(Utils.Details.WeaponSlot, ItemSlot.Weapon, monster, bankItems, null);
 
             await EquipBestForMonster(Utils.Details.ShieldSlot, ItemSlot.Shield, monster, bankItems, weapon);
-            await EquipBestForMonster(Utils.Details.HelmetSlot, ItemSlot.Helmet, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.BodyArmorSlot, ItemSlot.BodyArmor, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.LegArmorSlot, ItemSlot.LegArmor, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.BootsSlot, ItemSlot.Boots, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.Ring1Slot, ItemSlot.Ring1, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.Ring2Slot, ItemSlot.Ring2, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.AmuletSlot, ItemSlot.Amulet, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.Artifact1Slot, ItemSlot.Artifact1, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.Artifact2Slot, ItemSlot.Artifact2, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.Artifact3Slot, ItemSlot.Artifact3, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.Utility1Slot, ItemSlot.Utility1, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.Utility2Slot, ItemSlot.Utility2, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.BagSlot, ItemSlot.Bag, monster, bankItems);
-            await EquipBestForMonster(Utils.Details.RuneSlot, ItemSlot.Rune, monster, bankItems);
+            await EquipBestForMonster(Utils.Details.HelmetSlot, ItemSlot.Helmet, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.BodyArmorSlot, ItemSlot.BodyArmor, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.LegArmorSlot, ItemSlot.LegArmor, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.BootsSlot, ItemSlot.Boots, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.Ring1Slot, ItemSlot.Ring1, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.Ring2Slot, ItemSlot.Ring2, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.AmuletSlot, ItemSlot.Amulet, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.Artifact1Slot, ItemSlot.Artifact1, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.Artifact2Slot, ItemSlot.Artifact2, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.Artifact3Slot, ItemSlot.Artifact3, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.Utility1Slot, ItemSlot.Utility1, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.Utility2Slot, ItemSlot.Utility2, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.BagSlot, ItemSlot.Bag, monster, bankItems, weapon);
+            await EquipBestForMonster(Utils.Details.RuneSlot, ItemSlot.Rune, monster, bankItems, weapon);
 
             await GetFood(bankItems);
         }
 
         private async Task GetFood(List<SimpleItemSchema> bankItems)
         {
-            // Save a little room, just in case of item swaps
-            var space = GetFreeInventorySpace() - 10;
+            // Save room, just in case of inventory issues
+            var space = GetFreeInventorySpace() / 2;
             if (space <= 0)
             {
                 Console.WriteLine("No room for food!");
@@ -1273,11 +1336,12 @@ namespace Artifacts
             }
 
             var found = false;
+            var itemsTaken = 0;
             foreach (var bankItem in bankItems)
             {
                 if (bankItem.Quantity > 0)
                 {
-                    var item = await Items.Instance.GetItem(bankItem.Code);
+                    var item = Items.Instance.GetItem(bankItem.Code);
                     if (item.Type == "consumable" && item.Level <= Utils.Details.Level)
                     {
                         var amount = Math.Min(space, bankItem.Quantity);
@@ -1291,10 +1355,13 @@ namespace Artifacts
                         if (withdrawn > 0)
                         {
                             found = true;
+                            itemsTaken++;
                         }
 
                         space -= withdrawn;
-                        if (space <= 0)
+
+                        // Don't take more than 2 kinds of food
+                        if (space <= 0 || itemsTaken >= 2)
                         {
                             return;
                         }
@@ -1305,12 +1372,14 @@ namespace Artifacts
             if (!found)
             {
                 Console.WriteLine("No food left, now we are the chef");
-                await CookBankFood(bankItems);
+                await CookBankFood();
             }
         }
 
-        private async Task CookBankFood(List<SimpleItemSchema> bankItems)
+        private async Task CookBankFood()
         {
+            List<SimpleItemSchema> bankItems = await Bank.Instance.GetItems();
+
             // See if we can cook something in the bank
             var items = await Items.Instance.GetAllItems();
             var cookingLevel = Utils.GetSkillLevel("cooking");
@@ -1337,34 +1406,26 @@ namespace Artifacts
 
                 if (quantity != 0 && quantity != int.MaxValue)
                 {
-                    var cooked = 0;
-                    while (cooked < quantity)
+                    var batch = await CraftItems(recipe, quantity, bankOnly: true);
+                    Console.WriteLine($"Chef Cooked {batch} {recipe.Code}");
+                    if (batch > 0)
                     {
-                        var batch = await CraftItems(recipe, quantity, bankOnly: true);
-                        Console.WriteLine($"Chef Cooked {batch} {recipe.Code}");
-                        if (batch > 0)
-                        {
-                            await MoveTo(MapContentType.Bank);
-                            await DepositAllItems();
-                            cooked += batch;
-                        }
-                        else
-                        {
-                            // Out of ingredients
-                            break;
-                        }
+                        await MoveTo(MapContentType.Bank);
+                        await DepositAllItems();
+                        await CookBankFood();
+                        return;
                     }
                 }
             }
         }
 
-        private async Task<ItemSchema> EquipBestForMonster(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon = null)
+        private async Task<ItemSchema> EquipBestForMonster(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon)
         {
             ItemSchema currentItem = null;
             var currentValue = 0.0;
             if (!string.IsNullOrEmpty(currentEquipped))
             {
-                currentItem = await Items.Instance.GetItem(currentEquipped);
+                currentItem = Items.Instance.GetItem(currentEquipped);
                 currentValue = Items.Instance.CalculateItemValue(currentItem, monster, weapon);
             }
 
@@ -1439,7 +1500,7 @@ namespace Artifacts
                 }
 
 
-                var item = await Items.Instance.GetItem(bankItem.Code);
+                var item = Items.Instance.GetItem(bankItem.Code);
                 if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
                 {
                     if (bestItem == null)
@@ -1477,7 +1538,7 @@ namespace Artifacts
                     continue;
                 }
 
-                var item = await Items.Instance.GetItem(inventoryItem.Code);
+                var item = Items.Instance.GetItem(inventoryItem.Code);
                 if (item.Level > Utils.Details.Level)
                 {
                     // Too high level for us
@@ -1554,7 +1615,7 @@ namespace Artifacts
             {
                 if (ex.ErrorCode == 496)
                 {
-                    var item = await Items.Instance.GetItem(code);
+                    var item = Items.Instance.GetItem(code);
                     foreach (var condition in item.Conditions)
                     {
                         await MeetCondition(condition, item);

@@ -18,10 +18,11 @@ namespace Artifacts
         internal async Task RunAsync()
         {
             Console.WriteLine($"Starting crafter loop");
-            await ProcessEvents();
 
             while (true)
             {
+                await ProcessEvents();
+
                 var skills = new List<string>([
                     "weaponcrafting",
                     "gearcrafting",
@@ -87,11 +88,36 @@ namespace Artifacts
                 {
                     await ProcessMerchant(activeEvent);
                 }
+                else if (activeEvent.Map?.Interactions?.Content?.Type == MapContentType.Monster)
+                {
+                    await ProcessMonsterEvent(activeEvent);
+                }
             }
+        }
+
+        private async Task ProcessMonsterEvent(ActiveEventSchema activeEvent)
+        {
+            Console.WriteLine($"{activeEvent.Code} is present, trying to kill stuff");
+            var monster = await Monsters.Instance.GetMonster(activeEvent.Map.Interactions.Content.Code);
+            if (monster == null)
+            {
+                Console.WriteLine($"No monsters here");
+                return;
+            }
+
+            if (monster.Level >= Utils.Details.Level)
+            {
+                Console.WriteLine($"{monster.Code} ({monster.Level}) is too high level for us ({Utils.Details.Level})");
+                return;
+            }
+
+            await _character.FightLoop(100, monster.Code);
         }
 
         private async Task ProcessMerchant(ActiveEventSchema activeEvent)
         {
+            Console.WriteLine($"{activeEvent.Code} is present, trying to sell stuff");
+
             var items = await Npcs.Instance.GetNpcItems(activeEvent.Code);
             var bankItems = await Bank.Instance.GetItems();
             foreach (var item in items)
@@ -213,6 +239,9 @@ namespace Artifacts
                 var taskItems = await Items.Instance.GetTaskItems();
                 var newItems = items.Where(x => !x.Craft.Items.Any(c => taskItems.Any(i => i.Code == c.Code))).ToList();
 
+                await _character.MoveTo(MapContentType.Bank);
+                await _character.DepositAllItems();
+                    
                 return await CraftItemsAtLevel(targetLevel, craftAmount, newItems, bankItems, ignoreBankCheck: true);
             }
 
@@ -266,7 +295,7 @@ namespace Artifacts
                     {
                         try
                         {
-                            var item = await Items.Instance.GetItem(bankItem.Code);
+                            var item = Items.Instance.GetItem(bankItem.Code);
 
                             // Go to relevant workshop
                             await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
@@ -303,7 +332,7 @@ namespace Artifacts
         private async Task<int> CalculateRecycleQuantity(List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, SimpleItemSchema bankItem)
         {
             // If there are 5 of a better item in every way we can recycle all of them, if not we need to keep 5
-            var item = await Items.Instance.GetItem(bankItem.Code);
+            var item = Items.Instance.GetItem(bankItem.Code);
 
             // Can it be recycled?
             if (item.Craft == null ||
@@ -326,7 +355,7 @@ namespace Artifacts
             List<ItemSchema> comparables = new List<ItemSchema>();
             foreach (var otherBankItem in bankItems)
             {
-                var comparable = await Items.Instance.GetItem(otherBankItem.Code);
+                var comparable = Items.Instance.GetItem(otherBankItem.Code);
                 if (comparable.Type != item.Type)
                 {
                     continue;

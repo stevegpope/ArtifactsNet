@@ -44,6 +44,8 @@ namespace Artifacts
             
             Map.Config(configuration, httpClient);
             Items.Config(configuration, httpClient);
+            await Items.Instance.CacheItems();
+
             Events.Config(configuration, httpClient);
             Npcs.Config(configuration, httpClient);
             Resources.Config(configuration, httpClient);

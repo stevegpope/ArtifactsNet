@@ -42,14 +42,14 @@ namespace Artifacts
 
         internal async Task<DataPageMapSchema> GetMapLayer(MapContentType contentType, string code = null, MapLayer layer = MapLayer.Overworld)
         {
-            var mapSchema = await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code);
-            return mapSchema;
+            var mapSchema = await Utils.ApiCall(async () => await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code));
+            return mapSchema as DataPageMapSchema;
         }
 
         internal async Task<MapSchema> GetMapPosition(int x, int y)
         {
-            var mapResponseSchema = await _api.GetMapByPositionMapsLayerXYGetAsync(MapLayer.Overworld, x, y);
-            return mapResponseSchema.Data;
+            var mapResponseSchema = await Utils.ApiCall(async () => await _api.GetMapByPositionMapsLayerXYGetAsync(MapLayer.Overworld, x, y));
+            return (mapResponseSchema as MapResponseSchema).Data;
         }
     }
 }

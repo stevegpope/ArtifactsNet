@@ -47,7 +47,13 @@ namespace Artifacts
 
             do
             {
-                page = await _api.GetBankItemsMyBankItemsGetAsync(page: pageNum);
+                var data = await Utils.ApiCall(async () =>
+                {
+                    return await _api.GetBankItemsMyBankItemsGetAsync(page: pageNum);
+                });
+
+                page = data as DataPageSimpleItemSchema;
+
                 result.AddRange(page.Data.Where(i => i.Quantity > 0));
                 pageNum++;
             } while (pageNum <= page.Pages);
@@ -57,8 +63,8 @@ namespace Artifacts
 
         internal async Task<BankSchema> GetBankDetails()
         {
-            var result = await _api.GetBankDetailsMyBankGetAsync();
-            return result.Data;
+            var result = await Utils.ApiCall(async () => _api.GetBankDetailsMyBankGetAsync());
+            return (result as BankResponseSchema).Data;
         }
     }
 }

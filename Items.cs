@@ -43,7 +43,7 @@ namespace Artifacts
             _tasks = new TasksApi(httpClient, config);
         }
 
-        private async Task CacheItems()
+        internal async Task CacheItems()
         {
             if (_cache == null)
             {
@@ -75,9 +75,8 @@ namespace Artifacts
             return _taskItems;
         }
 
-        internal async Task<ItemSchema> GetItem(string code)
+        internal ItemSchema GetItem(string code)
         {
-            await CacheItems();
             if (_cache.ContainsKey(code))
             { 
                 return _cache[code]; 
@@ -131,6 +130,7 @@ namespace Artifacts
             if (item.Level > Utils.Details.Level)
             {
                 // Too high level for us
+                Console.WriteLine($"{item.Code} is too high level for us at {item.Level}");
                 return 0;
             }
 
@@ -250,7 +250,7 @@ namespace Artifacts
                 {
                     if (weaponEffect.Code.StartsWith("attack") || weaponEffect.Code.StartsWith("dmg_"))
                     {
-                        var weaponElement = effect.Code.Substring(effect.Code.LastIndexOf('_') + 1);
+                        var weaponElement = weaponEffect.Code.Substring(weaponEffect.Code.LastIndexOf('_') + 1);
                         if (weaponElement == element)
                         {
                             value += effect.Value * estimatedRounds;
