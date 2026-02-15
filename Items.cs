@@ -159,12 +159,34 @@ namespace Artifacts
                     case "attack_air":
                     case "attack_fire":
                     case "heal":
+                    case "healing":
+                    case "poison":
+                    case "lifesteal":
+                    case "reconstitution":
+                    case "burn":
+                    case "guard":
+                    case "shell":
+                    case "frenzy":
+                    case "void_drain":
+                    case "berserker_rage":
+                    case "vampiric_strike":
+                    case "barrier":
+                    case "protective_bubble":
                     case "restore":
                         value += effect.Value * estimatedRounds;
                         break;
                 }
 
                 value += AddBoost(weapon, estimatedRounds, effect);
+
+                // Poison
+                if (monster.Effects != null && monster.Effects.Any())
+                {
+                    if (monster.Effects.Any(x => x.Code == "poison"))
+                    {
+                        value += item.Effects.Where(x => x.Code == "antipoison").Sum(x => x.Value) * estimatedRounds;
+                    }
+                }
 
                 // Specific elements count twice
                 if (monster.AttackAir > 0)
@@ -330,8 +352,10 @@ namespace Artifacts
             {
                 // These effects have negative values!
                 if (effect.Code == skill) { value -= effect.Value; }
+
+                // These are normal, with prospecting being the most important for drops
                 if (effect.Code == "wisdom") { value += effect.Value; }
-                if (effect.Code == "prospecting") { value += effect.Value; }
+                if (effect.Code == "prospecting") { value += effect.Value * 5; }
             }
 
             return value;

@@ -101,6 +101,12 @@ namespace Artifacts
                     // An action is already in progress. Try again
                     return await ApiCall(call);
                 }
+                else if (ex.ErrorCode == 502)
+                { 
+                    Console.WriteLine($"{ex.ErrorContent}, trying again");
+                    await Task.Delay(5000); 
+                    return await ApiCall(call);
+                }
 
                 Console.WriteLine($"API call failed: {ex.ErrorContent}, code  {ex.ErrorCode}");
                 throw;

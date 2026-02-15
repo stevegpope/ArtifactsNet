@@ -23,15 +23,7 @@ namespace Artifacts
             {
                 await ProcessEvents();
 
-                var skills = new List<string>([
-                    "weaponcrafting",
-                    "gearcrafting",
-                    "jewelrycrafting",
-                    "alchemy"
-                ]);
-
-                // Choose a craft skill
-                var skill = skills.ElementAt(_random.Next(skills.Count));
+                string skill = ChooseCraftingSkill();
 
                 int craftAmount = 1;
                 switch (skill)
@@ -71,6 +63,31 @@ namespace Artifacts
                 // Recycle leftovers
                 await Recycle();
             }
+        }
+
+        private string ChooseCraftingSkill()
+        {
+            var skills = new List<string>([
+                "weaponcrafting",
+                "gearcrafting",
+                "jewelrycrafting",
+                "alchemy"
+            ]);
+
+            var result = new List<string>();
+
+            // Eliminate skills that are 5 or more levels higher than all the others
+            foreach (var skill in skills)
+            {
+                var others = skills.Where(x => x != skill);
+                var level = Utils.GetSkillLevel(skill);
+                if (others.All(x => Utils.GetSkillLevel(x) >= level - 5))
+                {
+                    result.Add(skill);
+                }
+            }
+
+            return result.ElementAt(_random.Next(result.Count));
         }
 
         private async Task ProcessEvents()

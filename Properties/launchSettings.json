@@ -9,7 +9,7 @@
     },
     "baz2": {
       "commandName": "Project",
-      "commandLineArgs": "baz2 tasker"
+      "commandLineArgs": "baz2 crafter"
     },
     "baz3": {
       "commandName": "Project",
