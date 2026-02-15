@@ -7,6 +7,7 @@ namespace Artifacts
     internal class Bank
     {
         private MyAccountApi _api;
+        private GrandExchangeApi _exchangeApi;
         private static Configuration _config;
         private static HttpClient _httpClient;
 
@@ -37,6 +38,17 @@ namespace Artifacts
             )
         {
             _api = new MyAccountApi(httpClient, config);
+            _exchangeApi = new GrandExchangeApi(httpClient, config);
+        }
+
+        internal async Task<List<GEOrderSchema>> GetExchangeOrders(string code)
+        {
+            var orders = await Utils.ApiCall(async () =>
+            {
+                return await _exchangeApi.GetGeSellOrdersGrandexchangeOrdersGetAsync(code);
+            }) as DataPageGEOrderSchema;
+
+            return orders.Data;
         }
 
         internal async Task<List<SimpleItemSchema>> GetItems()

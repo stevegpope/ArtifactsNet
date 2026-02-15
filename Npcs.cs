@@ -39,6 +39,21 @@ namespace Artifacts
             _api = new NPCsApi(httpClient, config);
         }
 
+        internal async Task<NPCItem> FindNpcItem(string code)
+        {
+            var page = await Utils.ApiCall(async () =>
+            {
+                return await _api.GetAllNpcsItemsNpcsItemsGetAsync(code);
+            }) as DataPageNPCItem;
+
+            if (page == null || page.Data == null || page.Data.Count == 0)
+            {
+                return null;
+            }
+
+            return page.Data.First();
+        }
+
         internal async Task<List<NPCItem>> GetNpcItems(string code)
         {
             var items = await Utils.ApiCall(async () =>

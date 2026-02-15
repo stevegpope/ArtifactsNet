@@ -518,6 +518,12 @@ namespace Artifacts
 
             var remaining = total - withdrawn;
 
+            int amountFromMarket = await GatherFromMarket(code, remaining);
+            if (amountFromMarket > 0)
+            {
+                return amountFromMarket + withdrawn;
+            }
+
             var item = Items.Instance.GetItem(code);
             if (item.Craft != null)
             {
@@ -540,8 +546,169 @@ namespace Artifacts
                 return foughtFor + withdrawn;
             }
 
+            int amountFromNpcs = await GatherFromNpc(code, remaining);
+            if (amountFromNpcs > 0)
+            {
+                return amountFromNpcs + withdrawn;
+            }
+
             Console.WriteLine($"No way to gather, craft, or hunt for {code}, we cannot craft this\n");
             return 0;
+        }
+
+        private async Task<int> GatherFromMarket(string code, int total)
+        {
+            Console.WriteLine($"Check market for {total} {code}");
+            var orders = await Bank.Instance.GetExchangeOrders(code);
+            if (!orders.Any())
+            {
+                return 0;
+            }
+
+            Console.WriteLine($"There are orders for {code}, going to exchange");
+
+            var cheapest = orders.OrderBy(x => x.Price);
+            var gold = await FetchGoldForOrders(code, total, cheapest);
+            if (gold == 0)
+            {
+                return 0;
+            }
+
+            await MoveTo(MapContentType.Bank);
+
+            if (await WithdrawGold(gold) != gold)
+            {
+                Console.WriteLine($"Not enough gold in the bank!");
+                return 0;
+            }
+
+            await MoveTo(MapContentType.GrandExchange);
+
+            // Orders changed?
+            orders = await Bank.Instance.GetExchangeOrders(code);
+            if (!orders.Any())
+            {
+                return 0;
+            }
+
+
+            var remaining = total;
+            var gotten = 0;
+            cheapest = orders.OrderBy(x => x.Price);
+
+            while (remaining > 0)
+            {
+                if (!cheapest.Any()) break;
+
+                var order = cheapest.First();
+                var amount = Math.Min(remaining, order.Quantity);
+
+                try
+                {
+                    var exchange = await BuyExchangeOrder(order.Id, amount);
+                    gotten += exchange.Data.Order.Quantity;
+                    remaining -= exchange.Data.Order.Quantity;
+                }
+                catch (ApiException ex)
+                {
+                    Console.WriteLine($"GE transaction error: {ex.ErrorContent}");
+                    return gotten;
+                }
+            }
+
+            return gotten;
+        }
+
+        private async Task<int> FetchGoldForOrders(string code, int total, IOrderedEnumerable<GEOrderSchema> cheapest)
+        {
+            var remaining = total;
+            var gold = 0;
+            foreach (var order in cheapest)
+            {
+                var amount = Math.Min(remaining, order.Quantity);
+                gold += amount * order.Price;
+                remaining -= amount;
+
+                if (remaining <= 0)
+                {
+                    return gold;
+                }
+            }
+
+            return 0;
+        }
+
+        private async Task<GETransactionResponseSchema> BuyExchangeOrder(string orderId, int quantity)
+        {
+            Console.WriteLine($"Order {quantity} from {orderId}");
+            return await Utils.ApiCall(async () =>
+            {
+                return await _api.ActionGeBuyItemMyNameActionGrandexchangeBuyPostAsync(Name, new GEBuyOrderSchema(orderId, quantity));
+            }) as GETransactionResponseSchema;
+        }
+
+        private async Task<int> GatherFromNpc(string code, int total)
+        {
+            var item = await Npcs.Instance.FindNpcItem(code);
+            if (item != null && item.BuyPrice > 0)
+            {
+                Console.WriteLine($"Try to buy {total} {code} from NPC");
+                var maps = await Map.Instance.GetMapLayer(MapContentType.Npc, item.Npc);
+                while (maps.Data.Any())
+                {
+                    var map = maps.Data.First();
+                    maps.Data.Remove(map);
+
+                    if (map.Layer == MapLayer.Overworld)
+                    {
+                        try
+                        {
+                            // Double check that we can move to him
+                            Console.WriteLine($"Try to move to NPC {item.Npc}");
+                            await Move(map.X, map.Y);
+                        }
+                        catch (Exception ex)
+                        {
+                            // We cannot move to the npc!
+                            Console.WriteLine($"Cannot move to {item.Npc}");
+                            continue;
+                        }
+
+                        var remaining = item.BuyPrice.Value * total;
+
+                        while (remaining > 0)
+                        {
+                            Console.WriteLine($"Gather {item.BuyPrice.Value * total} {item.Currency} to buy from NPC");
+                            var gathered = await GatherItems(item.Currency, item.BuyPrice.Value * total);
+                            if (gathered > 0)
+                            {
+                                remaining -= gathered;
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Could not gather {item.Currency}!");
+                                return 0;
+                            }
+                        }
+
+                        Console.WriteLine($"Move to NPC {item.Npc}");
+                        await Move(map.X, map.Y);
+                        await BuyNpcItem(code, total);
+                        return total;
+                    }
+                }
+            }
+
+            return 0;
+        }
+
+        private async Task<NpcMerchantTransactionResponseSchema> BuyNpcItem(string code, int remaining)
+        {
+            return await Utils.ApiCall(async () =>
+            {
+                Console.WriteLine($"Buy {remaining} {code} from NPC");
+                return await _api.ActionNpcBuyItemMyNameActionNpcBuyPostAsync(Name, new NpcMerchantBuySchema(code, remaining));
+            }) as NpcMerchantTransactionResponseSchema;
         }
 
         private async Task<int> GatherResources(string code, ItemSchema doNotUse, int remaining, ItemSchema item, ResourceSchema resource)
@@ -821,48 +988,52 @@ namespace Artifacts
 
             foreach (var item in Utils.Details.Inventory)
             {
-                if (string.IsNullOrEmpty(item.Code))
+                if (string.IsNullOrEmpty(item.Code) || item.Quantity == 0)
                 {
                     continue;
                 }
 
-                try
-                {
-                    Console.WriteLine($"Deposit {item.Code} {item.Quantity}");
-                    await Utils.ApiCall(async () =>
-                    {
-                        var items = new List<SimpleItemSchema>
-                        {
-                            new SimpleItemSchema(item.Code, item.Quantity)
-                        };
-
-                        return await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
-                    });
-                }
-                catch (ApiException ex)
-                {
-                    if (ex.ErrorCode == 478)
-                    {
-                        // We don't have enough of this item??
-                        Console.WriteLine($"We do not have {item.Quantity} {item.Code}");
-                    }
-                    else if (ex.ErrorCode == 461)
-                    {
-                        // Already in transaction?
-                        Console.WriteLine($"Item {item.Quantity} {item.Code} already in transaction");
-                    }
-                    else if (ex.ErrorCode == 462)
-                    {
-                        Console.WriteLine("Bank is full, trying to expand");
-                        await ExpandBank();
-                        await DepositAllItems();
-                        return;
-                    }
-
-                    throw;
-                }
+                await DepositItem(item.Code, item.Quantity);
             }
+        }
 
+        internal async Task DepositItem(string code, int quantity)
+        {
+            try
+            {
+                Console.WriteLine($"Deposit {code} {quantity}");
+                await Utils.ApiCall(async () =>
+                {
+                    var items = new List<SimpleItemSchema>
+                    {
+                        new SimpleItemSchema(code, quantity)
+                    };
+
+                    return await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
+                });
+            }
+            catch (ApiException ex)
+            {
+                if (ex.ErrorCode == 478)
+                {
+                    // We don't have enough of this item??
+                    Console.WriteLine($"We do not have {quantity} {code}");
+                }
+                else if (ex.ErrorCode == 461)
+                {
+                    // Already in transaction?
+                    Console.WriteLine($"Item {code} already in transaction");
+                }
+                else if (ex.ErrorCode == 462)
+                {
+                    Console.WriteLine("Bank is full, trying to expand");
+                    await ExpandBank();
+                    await DepositItem(code, quantity);
+                    return;
+                }
+
+                throw;
+            }
         }
 
         private async Task ExpandBank()
@@ -1461,7 +1632,7 @@ namespace Artifacts
                     if (batch > 0)
                     {
                         await MoveTo(MapContentType.Bank);
-                        await DepositAllItems();
+                        await DepositItem(recipe.Code, batch);
                         await CookBankFood();
                         return;
                     }
@@ -1730,7 +1901,7 @@ namespace Artifacts
         {
             try
             {
-                Console.WriteLine($"Selling {quantity} {code}");
+                Console.WriteLine($"Selling {quantity} {code} to Npc");
                 await Utils.ApiCall(async () =>
                 {
                     return await _api.ActionNpcSellItemMyNameActionNpcSellPostAsync(Name, new NpcMerchantBuySchema(code, quantity));
