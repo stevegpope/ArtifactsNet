@@ -246,11 +246,11 @@ namespace Artifacts
         private static double GetAttackValueWithResistance(int resValue, ItemSchema item, MonsterSchema monster, int estimatedRounds, string element)
         {
             var value = 0.0;
-            if (monster.ResWater > 0)
+            if (resValue > 0)
             {
                 value -= GetAttackValueForElements(item, estimatedRounds, element);
             }
-            else if (monster.ResWater < 0)
+            else if (resValue < 0)
             {
                 value += GetAttackValueForElements(item, estimatedRounds, element);
             }
