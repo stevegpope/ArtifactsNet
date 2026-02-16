@@ -9,6 +9,7 @@ namespace Artifacts
         private MonstersApi _api;
         private static Configuration _config;
         private static HttpClient _httpClient;
+        private static Dictionary<string, MonsterSchema> _cache = null;
 
         internal static Monsters Instance => lazy.Value;
 
@@ -21,6 +22,30 @@ namespace Artifacts
             _httpClient = httpClient;
         }
 
+        internal async Task CacheMonsters()
+        {
+            if (_cache == null)
+            {
+                Console.WriteLine("Caching monsters");
+                _cache = new Dictionary<string, MonsterSchema>();
+                var pageNum = 1;
+                while (true)
+                {
+                    var page = await _api.GetAllMonstersMonstersGetAsync(page: pageNum);
+                    foreach (var item in page.Data)
+                    {
+                        _cache[item.Code] = item;
+                    }
+
+                    pageNum++;
+                    if (pageNum > page.Pages)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
         internal DataPageMonsterSchema GetMonsters(int maxLevel, string dropCode = null)
         {
             var monsters = _api.GetAllMonstersMonstersGet(maxLevel: maxLevel, drop: dropCode);
@@ -29,16 +54,12 @@ namespace Artifacts
 
         internal async Task<MonsterSchema> GetMonster(string monsterCode)
         {
-            try
+            if (_cache.TryGetValue(monsterCode, out var monster))
             {
-                var response = await _api.GetMonsterMonstersCodeGetAsync(monsterCode);
-                return response.Data;
+                return monster; 
             }
-            catch(ApiException ex)
-            {
-                Console.WriteLine(ex.ErrorContent);
-                return null;
-            }
+
+            throw new Exception($"Unknown monster: {monsterCode}");
         }
 
         private static readonly Lazy<Monsters> lazy =

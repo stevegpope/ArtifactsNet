@@ -15,6 +15,9 @@ namespace Artifacts
         public static CharacterSchema Details { get; set; }
         public static BankSchema Bank { get; private set; }
         public static int LastCooldown { get; private set; }
+        public static Character Character { get; set; }
+
+        private static DateTime LastBossCheck = DateTime.MinValue;
 
         internal static string ToJson<T>(
             this T obj
@@ -32,7 +35,7 @@ namespace Artifacts
         static async Task Cooldown(int totalSeconds)
         {
             LastCooldown = totalSeconds;
-            const int maxWidth = 30;
+            const int maxWidth = 25;
             int barWidth = Math.Min(maxWidth, totalSeconds);
 
             for (int remaining = totalSeconds; remaining >= 0; remaining--)
@@ -47,6 +50,19 @@ namespace Artifacts
             }
 
             Console.WriteLine();
+
+            await BossCheck();
+        }
+
+        private static async Task BossCheck()
+        {
+            if (LastBossCheck > DateTime.UtcNow)
+            {
+                return;
+            }
+
+            LastBossCheck = DateTime.UtcNow + TimeSpan.FromMinutes(1);
+            await Character.MeetForBoss();
         }
 
         internal static double CalculateManhattanDistance(double x1, double y1, double x2, double y2)

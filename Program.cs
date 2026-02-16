@@ -46,10 +46,12 @@ namespace Artifacts
             Items.Config(configuration, httpClient);
             await Items.Instance.CacheItems();
 
+            Monsters.Config(configuration, httpClient);
+            await Monsters.Instance.CacheMonsters();
+
             Events.Config(configuration, httpClient);
             Npcs.Config(configuration, httpClient);
             Resources.Config(configuration, httpClient);
-            Monsters.Config(configuration, httpClient);
             Bank.Config(configuration, httpClient);
             Characters.Config(httpClient, configuration);
 
@@ -60,6 +62,7 @@ namespace Artifacts
 
             // Load character details to verify it exists
             await character.Init();
+            Utils.Character = character;
 
             var loop = new CharacterLoop(character, role, arguments);
             await loop.RunAsync();

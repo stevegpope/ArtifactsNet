@@ -110,67 +110,6 @@ namespace Artifacts
                     await ProcessMonsterEvent(activeEvent);
                 }
             }
-
-            // Check for characters at a boss waiting for backup
-            await MeetForBoss();
-        }
-
-        private async Task MeetForBoss()
-        {
-            var characters = await _character.GetCharacters();
-            foreach(var character in characters)
-            {
-                if (character.Name == Utils.Details.Name) continue;
-                string monster = await GetBoss(character);
-                if (monster != null)
-                {
-                    var fighter = await Characters.Instance.GetDetailsAsync(character.Name);
-                    Console.WriteLine($"Gear up to go help {fighter.Name} fight {monster}");
-                    await _character.GearUpMonster(monster);
-                    await _character.Rest();
-                    await _character.Move(fighter.X, fighter.Y);
-
-                    var x = fighter.X;
-                    var y = fighter.Y;
-
-                    // Wait for fight to finish (character will leave)
-                    while ((fighter.X == x && fighter.Y == y) || (fighter.X == 0 && fighter.Y == 0))
-                    {
-                        Console.WriteLine($"Wait 10 sec to see if the boss fight happened with {fighter.Name}");
-                        await Task.Delay(10000);
-                        fighter = await Characters.Instance.GetDetailsAsync(fighter.Name);
-
-                        var us = await Characters.Instance.GetDetailsAsync(Utils.Details.Name);
-                        if (us.Hp != us.MaxHp)
-                        {
-                            Console.WriteLine("We are hurt by boss, resting");
-                            await _character.Rest();
-                        }
-                        if (us.X != fighter.X || us.Y != fighter.Y)
-                        {
-                            Console.WriteLine("We were moved by boss, going back");
-                            await _character.Move(x, y);
-                        }
-                    }
-
-                    return;
-                }
-            }
-        }
-
-        private async Task<string> GetBoss(CharacterSchema character)
-        {
-            var map = await Map.Instance.GetMapPosition(character.X, character.Y);
-            if (map?.Interactions?.Content?.Type == MapContentType.Monster)
-            {
-                var monster = await Monsters.Instance.GetMonster(map.Interactions.Content.Code);
-                if (monster.Type == MonsterType.Boss)
-                {
-                    return monster.Code;
-                }
-            }
-
-            return null;
         }
 
         private async Task ProcessMonsterEvent(ActiveEventSchema activeEvent)

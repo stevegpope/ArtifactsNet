@@ -75,7 +75,7 @@ namespace Artifacts
 
         internal async Task<BankSchema> GetBankDetails()
         {
-            var result = await Utils.ApiCall(async () => _api.GetBankDetailsMyBankGetAsync());
+            var result = await Utils.ApiCall(async () => await _api.GetBankDetailsMyBankGetAsync());
             return (result as BankResponseSchema).Data;
         }
     }

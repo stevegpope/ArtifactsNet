@@ -16,7 +16,7 @@ namespace Artifacts
 
         internal async Task RunAsync()
         {
-            Console.WriteLine($"Starting fighter loop");
+            Console.WriteLine($"Starting chef");
 
             while (true)
             {
@@ -35,7 +35,7 @@ namespace Artifacts
                 //Console.WriteLine($"Fighter chose monster {monster}");
 
                 // TODO: more fights than this after testing
-                await _character.GatherItems("king_slime_sword", 1);
+                await _character.GatherItems("cooked_shrimp", 10000);
             }
         }
     }

@@ -724,7 +724,7 @@ namespace Artifacts
             while (leftToGet > 0)
             {
                 var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: leftToGet * Utils.LastCooldown);
-                Console.WriteLine($"Gather {gathered}/{remaining} {code}. ETA: {estimatedTime}");
+                Console.WriteLine($"{gathered}/{remaining} {code} ETA: {estimatedTime}");
 
                 try
                 {
@@ -812,7 +812,7 @@ namespace Artifacts
 
         internal async Task TrainGathering(int level, string skill, ItemSchema doNotUse = null)
         {
-            var items = await Items.Instance.GetAllItems();
+            var items = Items.Instance.GetAllItems();
             var gatherItems = items.Where(i => i.Value.Type == "resource" && i.Value.Subtype == skill);
 
             int total = 0;
@@ -857,6 +857,65 @@ namespace Artifacts
             // Go deposit the results in the bank
             await MoveTo(MapContentType.Bank);
             await DepositAllItems();
+        }
+
+        internal async Task MeetForBoss()
+        {
+            var characters = await GetCharacters();
+            foreach (var character in characters)
+            {
+                if (character.Name == Utils.Details.Name) continue;
+
+                string monster = await GetBoss(character);
+                if (monster != null)
+                {
+                    var fighter = await Characters.Instance.GetDetailsAsync(character.Name);
+                    Console.WriteLine($"Gear up to go help {fighter.Name} fight {monster}");
+                    await GearUpMonster(monster);
+                    await Rest();
+                    await Move(fighter.X, fighter.Y);
+
+                    var x = fighter.X;
+                    var y = fighter.Y;
+
+                    // Wait for fight to finish (character will leave)
+                    while ((fighter.X == x && fighter.Y == y) || (fighter.X == 0 && fighter.Y == 0))
+                    {
+                        Console.WriteLine($"Wait 10 sec to see if the boss fight happened with {fighter.Name}");
+                        await Task.Delay(10000);
+                        fighter = await Characters.Instance.GetDetailsAsync(fighter.Name);
+
+                        var us = await Characters.Instance.GetDetailsAsync(Utils.Details.Name);
+                        if (us.Hp != us.MaxHp)
+                        {
+                            Console.WriteLine("We are hurt by boss, resting");
+                            await Rest();
+                        }
+                        if (us.X != fighter.X || us.Y != fighter.Y)
+                        {
+                            Console.WriteLine("We were moved by boss, going back");
+                            await Move(x, y);
+                        }
+                    }
+
+                    return;
+                }
+            }
+        }
+
+        private async Task<string> GetBoss(CharacterSchema character)
+        {
+            var map = await Map.Instance.GetMapPosition(character.X, character.Y);
+            if (map?.Interactions?.Content?.Type == MapContentType.Monster)
+            {
+                var monster = await Monsters.Instance.GetMonster(map.Interactions.Content.Code);
+                if (monster.Type == MonsterType.Boss)
+                {
+                    return monster.Code;
+                }
+            }
+
+            return null;
         }
 
         private async Task<int> FightDrops(string monster, string code, int remaining)
@@ -1392,7 +1451,7 @@ namespace Artifacts
             return (CharacterFightResponseSchema)result;
         }
 
-        private async Task GearUpSkill(string skill, ItemSchema doNotUse)
+        internal async Task GearUpSkill(string skill, ItemSchema doNotUse)
         {
             Console.WriteLine($"Gear up for {skill}");
 
@@ -1604,20 +1663,62 @@ namespace Artifacts
             if (!found)
             {
                 Console.WriteLine("No food left, now we are the chef");
-                await CookBankFood();
+                await ChefRun();
             }
         }
 
-        private async Task CookBankFood()
+        internal async Task ChefRun()
+        {
+            if (!await CookBankFood())
+            {
+                Console.WriteLine("No food to cook, lets get fish to cook");
+                var recipes = GetRecipes("cooking");
+                var topDown = recipes.OrderByDescending(x => x.Level);
+                foreach (var recipe in topDown)
+                {
+                    if (recipe.Craft.Items.Count > 1) continue;
+
+                    var component = recipe.Craft.Items.First();
+                    if (component.Quantity > 1) continue;
+
+                    var item = Items.Instance.GetItem(component.Code);
+                    if (item.Subtype == "fishing")
+                    {
+                        Console.WriteLine($"Chef going for {item.Code}");
+                        if (await GatherItems(recipe.Code, 50) > 0)
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var bankItems = await Bank.Instance.GetItems();
+                await GetFood(bankItems);
+            }
+        }
+
+        private IEnumerable<ItemSchema> GetRecipes(string skill)
+        {
+            var items = Items.Instance.GetAllItems();
+
+            var craftSkill = Utils.GetSkillCraft(skill);
+            var skillLevel = Utils.GetSkillLevel(skill);
+
+            var recipes = items.Values.Where(i => i.Craft != null &&
+                i.Craft.Skill == craftSkill &&
+                i.Craft.Level <= skillLevel);
+
+            return recipes;
+        }
+
+        private async Task<bool> CookBankFood()
         {
             List<SimpleItemSchema> bankItems = await Bank.Instance.GetItems();
 
             // See if we can cook something in the bank
-            var items = await Items.Instance.GetAllItems();
-            var cookingLevel = Utils.GetSkillLevel("cooking");
-            var recipes = items.Values.Where(i => i.Craft != null &&
-                i.Craft.Skill == CraftSkill.Cooking &&
-                i.Craft.Level <= cookingLevel);
+            var recipes = GetRecipes("cooking").OrderByDescending(x => x.Level);
 
             foreach (var recipe in recipes)
             {
@@ -1644,11 +1745,16 @@ namespace Artifacts
                     {
                         await MoveTo(MapContentType.Bank);
                         await DepositItem(recipe.Code, batch);
+
+                        // Cook more if we can
                         await CookBankFood();
-                        return;
+
+                        return true;
                     }
                 }
             }
+
+            return false;
         }
 
         private async Task<ItemSchema> EquipBestForMonster(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon)
@@ -1672,6 +1778,11 @@ namespace Artifacts
 
             if (max == currentValue)
             {
+                if (currentItem == null && monster.Type == MonsterType.Boss)
+                {
+                    await MakePotions(monster, slotType, weapon);
+                }
+
                 // Nothing to change
                 Console.WriteLine($"Keep equipped {currentItem?.Code}");
                 return currentItem;
@@ -1712,6 +1823,50 @@ namespace Artifacts
                 }
 
                 return bestBankItem;
+            }
+        }
+
+        private async Task MakePotions(MonsterSchema monster, ItemSlot slotType, ItemSchema weapon)
+        {
+            string potion = null;
+            if (slotType == ItemSlot.Utility1)
+            {
+                // Put healing potions in slot 1
+                var potions = GetRecipes("alchemy");
+                potion = potions.OrderByDescending(x => x.Level).Where(x => x.Level < Utils.Details.Level && x.Effects.Any(y => y.Code == "restore")).FirstOrDefault().Code;
+            }
+            else if (slotType == ItemSlot.Utility2)
+            {
+                // Put damage or poison potions in slot 2
+                var potions = GetRecipes("alchemy");
+                if (monster.Effects.Any(x => x.Code == "poison"))
+                {
+                    potion = potions.OrderByDescending(x => x.Level).Where(x => x.Level < Utils.Details.Level && x.Effects.Any(y => y.Code == "antipoison")).FirstOrDefault().Code;
+                }
+                else
+                {
+                    var max = 0.0;
+                    foreach(var potionElement in potions)
+                    {
+                        var value = potionElement.Effects.Sum(x => Items.AddBoost(weapon, monster, 10, x));
+                        if (value > max)
+                        {
+                            potion = potionElement.Code;
+                            max = value;
+                        }
+                    }
+                }
+            }
+
+            if (potion != null)
+            {
+                const int batchSize = 50;
+                Console.WriteLine($"Making {batchSize} {potion} for boss fight");
+                var gathered = await GatherItems(potion, 50);
+                if (gathered > 0)
+                {
+                    await Equip(potion, slotType, gathered);
+                }
             }
         }
 

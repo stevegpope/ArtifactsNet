@@ -17,6 +17,11 @@ namespace Artifacts
 
         internal static Items Instance => lazy.Value;
 
+        const string air = "air";
+        const string earth = "earth";
+        const string water = "water";
+        const string fire = "fire";
+
         internal static void Config(
             Configuration config,
             HttpClient httpClient
@@ -87,16 +92,13 @@ namespace Artifacts
             throw new Exception($"Item with code {code} not found.");
         }
 
-        internal async Task<Dictionary<string, ItemSchema>> GetAllItems()
+        internal Dictionary<string, ItemSchema> GetAllItems()
         {
-            await CacheItems();
             return _cache;
         }
 
         internal async Task<DataPageItemSchema> GetItems(CraftSkill skill, int minLevel, int maxLevel)
         {
-            await CacheItems();
-
             var items = await _api.GetAllItemsItemsGetAsync(minLevel: minLevel, maxLevel: maxLevel, craftSkill: skill);
             if (items != null)
             {
@@ -153,7 +155,7 @@ namespace Artifacts
                     case "prospecting":
                     case "haste":
                     case "initative":
-                        value += effect.Value;
+                        value += effect.Value * 0.1;
                         continue;
                     case "dmg":
                     case "heal":
@@ -227,14 +229,8 @@ namespace Artifacts
 
         private static double GetAttackValueForMonster(ItemSchema item, MonsterSchema monster, int estimatedRounds)
         {
-            const string air = "air";
-            const string earth = "earth";
-            const string water = "water";
-            const string fire = "fire";
-
             double value = 0;
 
-            value += GetAttackValueForElements(item, estimatedRounds, earth, water, fire, air);
             value += GetAttackValueWithResistance(monster.ResAir, item, monster, estimatedRounds, air);
             value += GetAttackValueWithResistance(monster.ResEarth, item, monster, estimatedRounds, earth);
             value += GetAttackValueWithResistance(monster.ResWater, item, monster, estimatedRounds, water);
@@ -245,40 +241,41 @@ namespace Artifacts
 
         private static double GetAttackValueWithResistance(int resValue, ItemSchema item, MonsterSchema monster, int estimatedRounds, string element)
         {
-            var value = 0.0;
-            if (resValue > 0)
+            // From the docs:
+            // Round(Attack * Round(Resistance * 0.01))
+
+            var attack = GetAttackValueForElement(item, element);
+            var res = 1.0;
+            if (resValue < 0)
             {
-                value -= GetAttackValueForElements(item, estimatedRounds, element);
+                // Negative res value means this element is better
+                res = 1 + Math.Abs(resValue) * 0.01;
             }
-            else if (resValue < 0)
+            else if (resValue > 0)
             {
-                value += GetAttackValueForElements(item, estimatedRounds, element);
+                // Positive res value means this element is resisted
+                res = resValue * 0.01;
             }
 
-            return value;
+            var result = attack * res;
+            return result * estimatedRounds;
         }
 
-        private static double GetAttackValueForElements(ItemSchema item, int estimatedRounds, params string[] elements)
+        private static double GetAttackValueForElement(ItemSchema item, string element)
         {
             var prefix = "attack_";
-            var value = 0.0;
-            foreach (var element in elements)
-            {
-                var code = prefix + element;
-                value += item.Effects.Where(e => e.Code == code).Sum(e => e.Value) * estimatedRounds;
-            }
-
-            return value;
+            var code = prefix + element;
+            return item.Effects.Where(e => e.Code == code).Sum(e => e.Value);
         }
 
-        private static double AddBoost(ItemSchema weapon, MonsterSchema monster, int estimatedRounds, SimpleEffectSchema effect)
+        internal static double AddBoost(ItemSchema weapon, MonsterSchema monster, int estimatedRounds, SimpleEffectSchema effect)
         {
             var value = 0.0;
 
             if (weapon != null && (effect.Code.StartsWith("boost_") || effect.Code.StartsWith("dmg_")))
             {
                 var element = effect.Code.Substring(effect.Code.LastIndexOf('_') + 1);
-                if (!new[] { "air", "water", "earth", "fire" }.Any(x => x == element))
+                if (!new[] { air, water, earth, fire }.Any(x => x == element))
                 {
                     return value;
                 }
@@ -290,21 +287,20 @@ namespace Artifacts
                         var weaponElement = weaponEffect.Code.Substring(weaponEffect.Code.LastIndexOf('_') + 1);
                         if (weaponElement == element)
                         {
-                            // TODO: calculate based on monster resistances
                             value += effect.Value * estimatedRounds;
 
                             switch (element)
                             {
-                                case "air":
+                                case air:
                                     if (monster.ResAir < 0) value += effect.Value * estimatedRounds;
                                     break;
-                                case "water":
+                                case water:
                                     if (monster.ResWater < 0) value += effect.Value * estimatedRounds;
                                     break;
-                                case "earth":
+                                case earth:
                                     if (monster.ResEarth < 0) value += effect.Value * estimatedRounds;
                                     break;
-                                case "fire":
+                                case fire:
                                     if (monster.ResFire < 0) value += effect.Value * estimatedRounds;
                                     break;
                             }
