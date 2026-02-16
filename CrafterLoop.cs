@@ -117,13 +117,14 @@ namespace Artifacts
 
         private async Task MeetForBoss()
         {
-            var characters = await Characters.Instance.GetCharacters();
+            var characters = await _character.GetCharacters();
             foreach(var character in characters)
             {
+                if (character.Name == Utils.Details.Name) continue;
                 string monster = await GetBoss(character);
                 if (monster != null)
                 {
-                    var fighter = await Characters.Instance.GetDetailsAsync(Utils.Details.Name);
+                    var fighter = await Characters.Instance.GetDetailsAsync(character.Name);
                     Console.WriteLine($"Gear up to go help {fighter.Name} fight {monster}");
                     await _character.GearUpMonster(monster);
                     await _character.Rest();
@@ -157,7 +158,7 @@ namespace Artifacts
             }
         }
 
-        private async Task<string> GetBoss(ActiveCharacterSchema character)
+        private async Task<string> GetBoss(CharacterSchema character)
         {
             var map = await Map.Instance.GetMapPosition(character.X, character.Y);
             if (map?.Interactions?.Content?.Type == MapContentType.Monster)

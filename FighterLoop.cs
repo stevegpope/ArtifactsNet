@@ -35,7 +35,7 @@ namespace Artifacts
                 //Console.WriteLine($"Fighter chose monster {monster}");
 
                 // TODO: more fights than this after testing
-                await _character.FightLoop(2, "cow");
+                await _character.GatherItems("king_slime_sword", 1);
             }
         }
     }

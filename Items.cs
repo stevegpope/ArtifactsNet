@@ -1,6 +1,7 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using Newtonsoft.Json.Linq;
 
 namespace Artifacts
 {
@@ -177,91 +178,125 @@ namespace Artifacts
                         break;
                 }
 
-                value += AddBoost(weapon, estimatedRounds, effect);
+                value += AddBoost(weapon, monster, estimatedRounds, effect);
 
-                // Poison
-                if (monster.Effects != null && monster.Effects.Any())
-                {
-                    if (monster.Effects.Any(x => x.Code == "poison"))
-                    {
-                        value += item.Effects.Where(x => x.Code == "antipoison").Sum(x => x.Value) * estimatedRounds;
-                    }
-                }
+                value += GetPoisonValue(item, monster, estimatedRounds);
 
-                // Specific elements count twice
-                if (monster.AttackAir > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == "res_air").Sum(e => e.Value) * estimatedRounds;
-                }
-                if (monster.AttackEarth > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == "res_earth").Sum(e => e.Value) * estimatedRounds;
-                }
-                if (monster.AttackFire > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == "res_fire").Sum(e => e.Value) * estimatedRounds;
-                }
-                if (monster.AttackWater > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == "res_water").Sum(e => e.Value) * estimatedRounds;
-                }
+                value += GetResistanceValue(item, monster, estimatedRounds);
 
-                const string atk_air = "attack_air";
-                const string atk_earth = "attack_earth";
-                const string atk_fire = "attack_fire";
-                const string atk_water = "attack_water";
-
-                // We will double the damage calculation for elements other than the ones they resist
-                if (monster.ResAir > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                }
-                else if (monster.ResAir < 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                }
-
-                if (monster.ResEarth > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                }
-                else if (monster.ResEarth < 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                }
-
-                if (monster.ResFire > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                }
-                else if (monster.ResFire < 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                }
-
-                if (monster.ResWater > 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_earth).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_fire).Sum(e => e.Value) * estimatedRounds;
-                    value += item.Effects.Where(e => e.Code == atk_air).Sum(e => e.Value) * estimatedRounds;
-                }
-                else if (monster.ResWater < 0)
-                {
-                    value += item.Effects.Where(e => e.Code == atk_water).Sum(e => e.Value) * estimatedRounds;
-                }
+                value += GetMonsterResistValueForElement(item, monster, estimatedRounds);
             }
 
             Console.WriteLine($"{item.Code} {value} against {monster.Code}");
             return value;
         }
 
-        private static double AddBoost(ItemSchema weapon, int estimatedRounds, SimpleEffectSchema effect)
+        private static double GetResistanceValue(ItemSchema item, MonsterSchema monster, int estimatedRounds)
+        {
+            double value = 0;
+
+            // Specific elements count twice
+            if (monster.AttackAir > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_air").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.AttackEarth > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_earth").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.AttackFire > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_fire").Sum(e => e.Value) * estimatedRounds;
+            }
+            if (monster.AttackWater > 0)
+            {
+                value += item.Effects.Where(e => e.Code == "res_water").Sum(e => e.Value) * estimatedRounds;
+            }
+
+            return value;
+        }
+
+        private static double GetPoisonValue(ItemSchema item, MonsterSchema monster, int estimatedRounds)
+        {
+            double value = 0;
+            // Poison
+            if (monster.Effects != null && monster.Effects.Any())
+            {
+                if (monster.Effects.Any(x => x.Code == "poison"))
+                {
+                    value += item.Effects.Where(x => x.Code == "antipoison").Sum(x => x.Value) * estimatedRounds;
+                }
+            }
+
+            return value;
+        }
+
+        private static double GetMonsterResistValueForElement(ItemSchema item, MonsterSchema monster, int estimatedRounds)
+        {
+            const string air = "air";
+            const string earth = "earth";
+            const string water = "water";
+            const string fire = "fire";
+
+            double value = 0;
+
+            value += GetValueForElements(item, estimatedRounds, earth, water, fire, air);
+
+            if (monster.ResAir > 0)
+            {
+                // Remove element damage
+                value -= GetValueForElements(item, estimatedRounds, air);
+            }
+            else if (monster.ResAir < 0)
+            {
+                // We will double the damage calculation for elements other than the ones they resist
+                value += GetValueForElements(item, estimatedRounds, air);
+            }
+
+            if (monster.ResEarth > 0)
+            {
+                value -= GetValueForElements(item, estimatedRounds, earth);
+            }
+            else if (monster.ResEarth < 0)
+            {
+                value += GetValueForElements(item, estimatedRounds, earth);
+            }
+
+            if (monster.ResFire > 0)
+            {
+                value -= GetValueForElements(item, estimatedRounds, fire);
+            }
+            else if (monster.ResFire < 0)
+            {
+                value += GetValueForElements(item, estimatedRounds, fire);
+            }
+
+            if (monster.ResWater > 0)
+            {
+                value -= GetValueForElements(item, estimatedRounds, water);
+            }
+            else if (monster.ResWater < 0)
+            {
+                value += GetValueForElements(item, estimatedRounds, water);
+            }
+
+            return value;
+        }
+
+        private static double GetValueForElements(ItemSchema item, int estimatedRounds, params string[] elements)
+        {
+            var prefix = "attack_";
+            var value = 0.0;
+            foreach (var element in elements)
+            {
+                var code = prefix + element;
+                value += item.Effects.Where(e => e.Code == code).Sum(e => e.Value) * estimatedRounds;
+            }
+
+            return value;
+        }
+
+        private static double AddBoost(ItemSchema weapon, MonsterSchema monster, int estimatedRounds, SimpleEffectSchema effect)
         {
             var value = 0.0;
 
@@ -275,7 +310,24 @@ namespace Artifacts
                         var weaponElement = weaponEffect.Code.Substring(weaponEffect.Code.LastIndexOf('_') + 1);
                         if (weaponElement == element)
                         {
+                            // TODO: calculate based on monster resistances
                             value += effect.Value * estimatedRounds;
+
+                            switch (element)
+                            {
+                                case "air":
+                                    if (monster.ResAir < 0) value += effect.Value * estimatedRounds;
+                                    break;
+                                case "water":
+                                    if (monster.ResWater < 0) value += effect.Value * estimatedRounds;
+                                    break;
+                                case "earth":
+                                    if (monster.ResEarth < 0) value += effect.Value * estimatedRounds;
+                                    break;
+                                case "fire":
+                                    if (monster.ResFire < 0) value += effect.Value * estimatedRounds;
+                                    break;
+                            }
                         }
                     }
                 }

@@ -29,11 +29,24 @@ namespace Artifacts
                 });
         }
 
-        internal static async Task Cooldown(int seconds)
+        static async Task Cooldown(int totalSeconds)
         {
-            Console.WriteLine($"Waiting for cooldown: {seconds} seconds");
-            LastCooldown = seconds;
-            await Task.Delay(seconds * 1000);
+            LastCooldown = totalSeconds;
+            const int maxWidth = 30;
+            int barWidth = Math.Min(maxWidth, totalSeconds);
+
+            for (int remaining = totalSeconds; remaining >= 0; remaining--)
+            {
+                double progress = remaining / (double)totalSeconds;
+                int hashes = (int)Math.Round(barWidth * progress);
+
+                string bar = new string('#', hashes).PadRight(barWidth, ' ');
+                Console.Write($"\rCooldown [{bar}] {remaining}/{totalSeconds}s ");
+
+                await Task.Delay(1000);
+            }
+
+            Console.WriteLine();
         }
 
         internal static double CalculateManhattanDistance(double x1, double y1, double x2, double y2)
@@ -50,8 +63,18 @@ namespace Artifacts
                 {
                     if (TryGetProperty(result?.Data, "Cooldown", out object cooldown))
                     {
-                        var cooldownschema = (CooldownSchema)cooldown;
-                        await Utils.Cooldown(cooldownschema.TotalSeconds);
+                        if (cooldown is CooldownSchema cooldownSchema)
+                        {
+                            await Cooldown(cooldownSchema.TotalSeconds);
+                        }
+                        else if (cooldown is int cooldownValue)
+                        {
+                            await Cooldown(cooldownValue);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Cooldown: {cooldown} type {cooldown.GetType()}");
+                        }
                     }
 
                     if (TryGetProperty(result?.Data, "Character", out object character))
@@ -92,7 +115,7 @@ namespace Artifacts
                     var seconds = GetCooldownSeconds(content.ToString());
                     if (seconds > 0)
                     {
-                        await Utils.Cooldown(seconds);
+                        await Cooldown(seconds);
                     }
                     return await ApiCall(call);
                 }

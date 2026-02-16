@@ -41,13 +41,12 @@ namespace Artifacts
 
         internal async Task<CharacterSchema> GetDetailsAsync(string name)
         {
-            var result = await Utils.ApiCall(async () => await _charactersApi.GetCharacterCharactersNameGetAsync(name)) as CharacterResponseSchema;
-            return result.Data;
-        }
+            var result = await _charactersApi.GetCharacterCharactersNameGetAsync(name);
+            if (result.Data.Name == Utils.Details.Name)
+            {
+                Utils.Details = result.Data;
+            }
 
-        internal async Task<List<ActiveCharacterSchema>> GetCharacters()
-        {
-            var result = await Utils.ApiCall(async () => await _charactersApi.GetActiveCharactersCharactersActiveGetAsync()) as DataPageActiveCharacterSchema;
             return result.Data;
         }
     }

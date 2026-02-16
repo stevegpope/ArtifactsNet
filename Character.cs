@@ -518,12 +518,6 @@ namespace Artifacts
 
             var remaining = total - withdrawn;
 
-            int amountFromMarket = await GatherFromMarket(code, remaining);
-            if (amountFromMarket > 0)
-            {
-                return amountFromMarket + withdrawn;
-            }
-
             var item = Items.Instance.GetItem(code);
             if (item.Craft != null)
             {
@@ -550,6 +544,12 @@ namespace Artifacts
             if (amountFromNpcs > 0)
             {
                 return amountFromNpcs + withdrawn;
+            }
+
+            int amountFromMarket = await GatherFromMarket(code, remaining);
+            if (amountFromMarket > 0)
+            {
+                return amountFromMarket + withdrawn;
             }
 
             Console.WriteLine($"No way to gather, craft, or hunt for {code}, we cannot craft this\n");
@@ -670,7 +670,7 @@ namespace Artifacts
                         catch (Exception ex)
                         {
                             // We cannot move to the npc!
-                            Console.WriteLine($"Cannot move to {item.Npc}");
+                            Console.WriteLine($"Cannot move to {item.Npc}: {ex.Message}");
                             continue;
                         }
 
@@ -949,9 +949,10 @@ namespace Artifacts
         private async Task<List<string>> WaitForBackup()
         {
             var participants = new HashSet<string>();
+            var waited = 0;
             while(true)
             {
-                var characters = await Characters.Instance.GetCharacters();
+                var characters = await GetCharacters();
                 foreach (var character in characters)
                 {
                     if (character.Name == Utils.Details.Name)
@@ -970,15 +971,25 @@ namespace Artifacts
                         participants.Remove(character.Name);
                     }
 
-                    if (participants.Count >= 3)
+                    if (participants.Count >= 2)
                     {
-                        return participants.Take(3).ToList();
+                        Console.WriteLine($"Returning first 2 of participants: {string.Join(',', participants)}");
+                        return participants.Take(2).ToList();
                     }
                 }
 
-                Console.WriteLine($"Waiting 10s for 3 participants for boss: {string.Join(',', participants)}");
+                Console.WriteLine($"Wait 10/{waited}s so far for boss");
+                Console.WriteLine($"Present so far: {string.Join(',', participants)}");
+                waited += 10;
                 await Task.Delay(10000);
             }
+        }
+
+        internal async Task<List<CharacterSchema>> GetCharacters()
+        {
+            var response = await _api.GetMyCharactersMyCharactersGetAsync();
+            Utils.Details = response.Data.FirstOrDefault(x => x.Name ==  Utils.Details.Name);
+            return response.Data;
         }
 
         internal async Task DepositAllItems()
