@@ -2,6 +2,7 @@
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
 using Newtonsoft.Json.Linq;
+using static StackExchange.Redis.Role;
 
 namespace Artifacts
 {
@@ -153,12 +154,8 @@ namespace Artifacts
                     case "haste":
                     case "initative":
                         value += effect.Value;
-                        break;
+                        continue;
                     case "dmg":
-                    case "attack_earth":
-                    case "attack_water":
-                    case "attack_air":
-                    case "attack_fire":
                     case "heal":
                     case "healing":
                     case "poison":
@@ -175,17 +172,15 @@ namespace Artifacts
                     case "protective_bubble":
                     case "restore":
                         value += effect.Value * estimatedRounds;
-                        break;
+                        continue;
                 }
 
                 value += AddBoost(weapon, monster, estimatedRounds, effect);
-
-                value += GetPoisonValue(item, monster, estimatedRounds);
-
-                value += GetResistanceValue(item, monster, estimatedRounds);
-
-                value += GetMonsterResistValueForElement(item, monster, estimatedRounds);
             }
+
+            value += GetPoisonValue(item, monster, estimatedRounds);
+            value += GetResistanceValue(item, monster, estimatedRounds);
+            value += GetAttackValueForMonster(item, monster, estimatedRounds);
 
             Console.WriteLine($"{item.Code} {value} against {monster.Code}");
             return value;
@@ -219,7 +214,6 @@ namespace Artifacts
         private static double GetPoisonValue(ItemSchema item, MonsterSchema monster, int estimatedRounds)
         {
             double value = 0;
-            // Poison
             if (monster.Effects != null && monster.Effects.Any())
             {
                 if (monster.Effects.Any(x => x.Code == "poison"))
@@ -231,7 +225,7 @@ namespace Artifacts
             return value;
         }
 
-        private static double GetMonsterResistValueForElement(ItemSchema item, MonsterSchema monster, int estimatedRounds)
+        private static double GetAttackValueForMonster(ItemSchema item, MonsterSchema monster, int estimatedRounds)
         {
             const string air = "air";
             const string earth = "earth";
@@ -240,50 +234,31 @@ namespace Artifacts
 
             double value = 0;
 
-            value += GetValueForElements(item, estimatedRounds, earth, water, fire, air);
+            value += GetAttackValueForElements(item, estimatedRounds, earth, water, fire, air);
+            value += GetAttackValueWithResistance(monster.ResAir, item, monster, estimatedRounds, air);
+            value += GetAttackValueWithResistance(monster.ResEarth, item, monster, estimatedRounds, earth);
+            value += GetAttackValueWithResistance(monster.ResWater, item, monster, estimatedRounds, water);
+            value += GetAttackValueWithResistance(monster.ResFire, item, monster, estimatedRounds, fire);
 
-            if (monster.ResAir > 0)
-            {
-                // Remove element damage
-                value -= GetValueForElements(item, estimatedRounds, air);
-            }
-            else if (monster.ResAir < 0)
-            {
-                // We will double the damage calculation for elements other than the ones they resist
-                value += GetValueForElements(item, estimatedRounds, air);
-            }
+            return value;
+        }
 
-            if (monster.ResEarth > 0)
-            {
-                value -= GetValueForElements(item, estimatedRounds, earth);
-            }
-            else if (monster.ResEarth < 0)
-            {
-                value += GetValueForElements(item, estimatedRounds, earth);
-            }
-
-            if (monster.ResFire > 0)
-            {
-                value -= GetValueForElements(item, estimatedRounds, fire);
-            }
-            else if (monster.ResFire < 0)
-            {
-                value += GetValueForElements(item, estimatedRounds, fire);
-            }
-
+        private static double GetAttackValueWithResistance(int resValue, ItemSchema item, MonsterSchema monster, int estimatedRounds, string element)
+        {
+            var value = 0.0;
             if (monster.ResWater > 0)
             {
-                value -= GetValueForElements(item, estimatedRounds, water);
+                value -= GetAttackValueForElements(item, estimatedRounds, element);
             }
             else if (monster.ResWater < 0)
             {
-                value += GetValueForElements(item, estimatedRounds, water);
+                value += GetAttackValueForElements(item, estimatedRounds, element);
             }
 
             return value;
         }
 
-        private static double GetValueForElements(ItemSchema item, int estimatedRounds, params string[] elements)
+        private static double GetAttackValueForElements(ItemSchema item, int estimatedRounds, params string[] elements)
         {
             var prefix = "attack_";
             var value = 0.0;
@@ -303,6 +278,11 @@ namespace Artifacts
             if (weapon != null && (effect.Code.StartsWith("boost_") || effect.Code.StartsWith("dmg_")))
             {
                 var element = effect.Code.Substring(effect.Code.LastIndexOf('_') + 1);
+                if (!new[] { "air", "water", "earth", "fire" }.Any(x => x == element))
+                {
+                    return value;
+                }
+
                 foreach (var weaponEffect in weapon.Effects)
                 {
                     if (weaponEffect.Code.StartsWith("attack") || weaponEffect.Code.StartsWith("dmg_"))
@@ -407,7 +387,10 @@ namespace Artifacts
 
                 // These are normal, with prospecting being the most important for drops
                 if (effect.Code == "wisdom") { value += effect.Value; }
-                if (effect.Code == "prospecting") { value += effect.Value * 5; }
+                if (skill != "crafting")
+                {
+                    if (effect.Code == "prospecting") { value += effect.Value * 5; }
+                }
             }
 
             return value;

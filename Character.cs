@@ -175,8 +175,8 @@ namespace Artifacts
                 return 0;
             }
 
-            // Gear up for prospecting to get more xp
-            await GearUpSkill(null, null);
+            // Gear up for crafting to get more xp
+            await GearUpSkill("crafting", null);
 
             // Go to the crafting location
             await MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
