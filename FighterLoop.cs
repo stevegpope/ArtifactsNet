@@ -16,17 +16,15 @@ namespace Artifacts
 
         internal async Task RunAsync()
         {
-            Console.WriteLine($"Starting chef");
-
             while (true)
             {
                 // Choose a monster lower level than us
-                //var level = Utils.Details.Level - 1;
+                //var level = Utils.Details[Name].Level - 1;
                 //var candidates = Monsters.Instance.GetMonsters(maxLevel: level);
 
                 //if (candidates == null || candidates.Data.Count == 0)
                 //{
-                //    throw new ArgumentException($"No candidates available below level {Utils.Details.Level}");
+                //    throw new ArgumentException($"No candidates available below level {Utils.Details[Name].Level}");
                 //}
 
                 //// Pick a random one
@@ -35,7 +33,7 @@ namespace Artifacts
                 //Console.WriteLine($"Fighter chose monster {monster}");
 
                 // TODO: more fights than this after testing
-                await _character.GatherItems("cooked_shrimp", 10000);
+                await _character.FightLoop(100, "king_slime");
             }
         }
     }

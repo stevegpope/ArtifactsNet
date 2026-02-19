@@ -9,10 +9,12 @@ namespace Artifacts
     {
         private Character _character;
         private Random _random = Random.Shared;
+        private string Name { get; set; }
 
         public CrafterLoop(Character character)
         {
             _character = character;
+            Name = _character.Name;
         }
 
         internal async Task RunAsync()
@@ -42,7 +44,7 @@ namespace Artifacts
                 }
 
                 var craftSkill = Utils.GetSkillCraft(skill);
-                var level = Utils.GetSkillLevel(skill);
+                var level = _character.GetSkillLevel(skill);
                 Console.WriteLine($"Crafter chose skill {skill} at level {level} with {craftSkill}");
 
                 var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
@@ -80,8 +82,8 @@ namespace Artifacts
             foreach (var skill in skills)
             {
                 var others = skills.Where(x => x != skill);
-                var level = Utils.GetSkillLevel(skill);
-                if (others.All(x => Utils.GetSkillLevel(x) >= level - 5))
+                var level = _character.GetSkillLevel(skill);
+                if (others.All(x => _character.GetSkillLevel(x) >= level - 5))
                 {
                     result.Add(skill);
                 }
@@ -122,9 +124,9 @@ namespace Artifacts
                 return;
             }
 
-            if (monster.Level >= Utils.Details.Level)
+            if (monster.Level >= Utils.Details[Name].Level)
             {
-                Console.WriteLine($"{monster.Code} ({monster.Level}) is too high level for us ({Utils.Details.Level})");
+                Console.WriteLine($"{monster.Code} ({monster.Level}) is too high level for us ({Utils.Details[Name].Level})");
                 return;
             }
 
@@ -210,7 +212,6 @@ namespace Artifacts
 
         private async Task<int> CraftItemsAtLevel(int targetLevel, int craftAmount, List<ItemSchema> items, List<SimpleItemSchema> bankItems, bool ignoreBankCheck = false)
         {
-            const int TooMany = 5;
             var total = 0;
             var itemsAtLevel = items.Where(x => x.Level == targetLevel);
             Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
@@ -228,8 +229,8 @@ namespace Artifacts
                 if (!ignoreBankCheck)
                 {
                     var currentAmount = await CountAmountEverywhere(item.Code, characters, bankItems);
-
-                    if (currentAmount >= TooMany)
+                    var limit = item.Type == "ring" ? 10 : 5;
+                    if (currentAmount >= limit)
                     {
                         Console.WriteLine($"We already have enough ({currentAmount}) {item.Code}");
                         itemsList.Remove(item);
@@ -362,11 +363,17 @@ namespace Artifacts
 
             var currentAmount = await CountAmountEverywhere(bankItem.Code, characters, bankItems);
 
-            // Recycle any more than 5
-            if (currentAmount > 5)
+            // Recycle any more than 5 (10 for rings)
+            var limit = 5;
+            if (item.Type == "ring")
             {
-                Console.WriteLine($"Recycle {currentAmount - 5} {bankItem.Code} because we have {currentAmount} in total");
-                return currentAmount - 5;
+                limit = 10;
+            }
+
+            if (currentAmount > limit)
+            {
+                Console.WriteLine($"Recycle {currentAmount - limit} {bankItem.Code} because we have {currentAmount} in total");
+                return currentAmount - limit;
             }
 
             List<ItemSchema> comparables = new List<ItemSchema>();
@@ -384,7 +391,7 @@ namespace Artifacts
                 }
 
                 var bankItemAmount = await CountAmountEverywhere(otherBankItem.Code, characters, bankItems);
-                if (bankItemAmount < 5)
+                if (bankItemAmount < limit)
                 {
                     continue;
                 }

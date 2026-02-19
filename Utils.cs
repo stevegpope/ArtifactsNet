@@ -1,23 +1,15 @@
 ﻿using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using System.Text.RegularExpressions;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Artifacts
 {
     internal static class Utils
     {
-        public static CharacterSchema Details { get; set; }
+        public static Dictionary<string,CharacterSchema> Details = new Dictionary<string,CharacterSchema>();
         public static BankSchema Bank { get; private set; }
         public static int LastCooldown { get; private set; }
-        public static Character Character { get; set; }
-
-        private static DateTime LastBossCheck = DateTime.MinValue;
 
         internal static string ToJson<T>(
             this T obj
@@ -32,7 +24,7 @@ namespace Artifacts
                 });
         }
 
-        static async Task Cooldown(int totalSeconds)
+        internal static async Task Cooldown(int totalSeconds)
         {
             LastCooldown = totalSeconds;
             const int maxWidth = 25;
@@ -50,19 +42,6 @@ namespace Artifacts
             }
 
             Console.WriteLine();
-
-            await BossCheck();
-        }
-
-        private static async Task BossCheck()
-        {
-            if (LastBossCheck > DateTime.UtcNow)
-            {
-                return;
-            }
-
-            LastBossCheck = DateTime.UtcNow + TimeSpan.FromMinutes(1);
-            await Character.MeetForBoss();
         }
 
         internal static double CalculateManhattanDistance(double x1, double y1, double x2, double y2)
@@ -95,13 +74,17 @@ namespace Artifacts
 
                     if (TryGetProperty(result?.Data, "Character", out object character))
                     {
-                        Details = (CharacterSchema)character;
+                        var characterSchema = (CharacterSchema)character;
+                        Details[characterSchema.Name] = characterSchema;
                     }
 
                     if (TryGetProperty(result?.Data, "Characters", out object characters))
                     {
                         var list = (List<CharacterSchema>)characters;
-                        Details = list.First(x => x.Name == Details.Name);
+                        foreach(var characterSchema in list)
+                        {
+                            Details[characterSchema.Name] = characterSchema;
+                        }
                     }
 
                     if (TryGetProperty(result?.Data, "Bank", out object bank))
@@ -152,31 +135,6 @@ namespace Artifacts
             }
         }
 
-        internal static int GetSkillLevel(string skill)
-        {
-            switch (skill)
-            {
-                case "weaponcrafting":
-                    return Utils.Details.WeaponcraftingLevel;
-                case "gearcrafting":
-                    return Utils.Details.GearcraftingLevel;
-                case "jewelrycrafting":
-                    return Utils.Details.JewelrycraftingLevel;
-                case "cooking":
-                    return Utils.Details.CookingLevel;
-                case "alchemy":
-                    return Utils.Details.AlchemyLevel;
-                case "woodcutting":
-                    return Utils.Details.WoodcuttingLevel;
-                case "mining":
-                    return Utils.Details.MiningLevel;
-                case "fishing":
-                    return Utils.Details.FishingLevel;
-                default:
-                    throw new Exception($"Unexpected skill {skill}");
-            }
-        }
-
         internal static CraftSkill GetSkillCraft(string skill)
         {
             switch (skill)
@@ -221,34 +179,6 @@ namespace Artifacts
                 : 0;
 
             return (int)Math.Ceiling(result);
-        }
-
-        internal static MapSchema GetClosest(List<MapSchema> data)
-        {
-            if (data == null || data.Count == 0)
-            {
-                throw new ArgumentException("No map data");
-            }
-
-            MapSchema closest = null;
-            double minDistance = double.MaxValue;
-
-            foreach (var map in data)
-            {
-                var currentDistance = CalculateManhattanDistance(Details.X, Details.Y, map.X, map.Y);
-                if (currentDistance < minDistance)
-                {
-                    minDistance = currentDistance;
-                    closest = map;
-                }
-            }
-
-            return closest;
-        }
-
-        internal static ItemSlot GetSlot(string slotType)
-        {
-            return JsonConvert.DeserializeObject<ItemSlot>($"\"{slotType}\"");
         }
     }
 }

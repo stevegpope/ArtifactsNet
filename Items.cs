@@ -110,7 +110,7 @@ namespace Artifacts
             }
         }
 
-        internal bool IsBetterItem(ItemSchema bestItem, ItemSchema item, MonsterSchema monster, ItemSchema weapon)
+        internal bool IsBetterItem(ItemSchema bestItem, ItemSchema item, MonsterSchema monster, ItemSchema weapon, int maxLevel)
         {
             // Optimization
             if (bestItem != null && item != null && bestItem.Code == item.Code)
@@ -118,20 +118,20 @@ namespace Artifacts
                 return false;
             }
 
-            var item1Value = CalculateItemValue(bestItem, monster, weapon);
-            var item2Value = CalculateItemValue(item, monster, weapon);
+            var item1Value = CalculateItemValue(bestItem, monster, weapon, maxLevel);
+            var item2Value = CalculateItemValue(item, monster, weapon, maxLevel);
 
             return item2Value > item1Value;
         }
 
-        internal double CalculateItemValue(ItemSchema item, MonsterSchema monster, ItemSchema weapon)
+        internal double CalculateItemValue(ItemSchema item, MonsterSchema monster, ItemSchema weapon, int maxLevel)
         {
             if (item.Effects == null || item.Effects.Count == 0)
             {
                 return 0;
             }
 
-            if (item.Level > Utils.Details.Level)
+            if (item.Level > maxLevel)
             {
                 // Too high level for us
                 Console.WriteLine($"{item.Code} is too high level for us at {item.Level}");

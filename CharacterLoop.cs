@@ -28,17 +28,11 @@ namespace Artifacts
             await _character.MoveTo(MapContentType.Bank);
             await _character.DepositAllItems();
 
-            await CheckForGold();
-
             while (true)
             {
-                if (_role =="tasker")
-                {
-                    var loop = new TaskerLoop(_character);
-                    await loop.RunAsync();
-                    return;
-                }
-                else if (_role == "fighter")
+                await CheckForGold();
+
+                if (_role == "fighter")
                 {
                     var loop = new FighterLoop(_character);
                     await loop.RunAsync();
@@ -50,9 +44,9 @@ namespace Artifacts
                     await loop.RunAsync();
                     return;
                 }
-                else if (_role == "gatherer")
+                else if (_role == "boss")
                 {
-                    var loop = new GatherLoop(_character);
+                    var loop = new BossLoop(_character);
                     await loop.RunAsync();
                     return;
                 }

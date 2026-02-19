@@ -53,7 +53,6 @@ namespace Artifacts
             Npcs.Config(configuration, httpClient);
             Resources.Config(configuration, httpClient);
             Bank.Config(configuration, httpClient);
-            Characters.Config(httpClient, configuration);
 
             var character = new Character(
                 configuration,
@@ -62,7 +61,6 @@ namespace Artifacts
 
             // Load character details to verify it exists
             await character.Init();
-            Utils.Character = character;
 
             var loop = new CharacterLoop(character, role, arguments);
             await loop.RunAsync();
