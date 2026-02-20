@@ -1,6 +1,7 @@
 ﻿
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using StackExchange.Redis;
 
 namespace Artifacts
 {
@@ -37,12 +38,32 @@ namespace Artifacts
             const string boss = "king_slime";
             var monster = await Monsters.Instance.GetMonster(boss);
 
-            var gearUpTasks = new List<Task>();
-            gearUpTasks.Add(topGuys.ElementAt(0).GearUpMonster(boss));
-            gearUpTasks.Add(topGuys.ElementAt(1).GearUpMonster(boss));
-            gearUpTasks.Add(topGuys.ElementAt(2).GearUpMonster(boss));
+            var gearUp = async (Character character) =>
+            {
+                await character.MoveTo(MapContentType.Bank);
+                await character.DepositAllItems();
+                await character.GearUpMonster(boss);
+                Console.WriteLine($"{character.Name} gear up 1 complete");
+                await character.GearUpMonster(boss);
+                Console.WriteLine($"{character.Name} gear up 2 complete");
+                await character.GearUpMonster(boss);
+                Console.WriteLine($"{character.Name} gear up 3 complete");
+                await character.GearUpMonster(boss);
+                Console.WriteLine($"{character.Name} gear up 4 complete");
+                await character.GearUpMonster(boss);
+                Console.WriteLine($"{character.Name} gear up 5 complete");
+                Console.WriteLine($"{character.Name} READY FOR {boss}");
+            };
+
+            var gearUpTasks = new List<Task>
+            {
+                gearUp(topGuys.ElementAt(0)),
+                gearUp(topGuys.ElementAt(1)),
+                gearUp(topGuys.ElementAt(2)),
+            };
 
             var supportTasks = new List<Task>();
+            var potion = Items.Instance.GetItem("minor_health_potion");
             foreach (var guy in topGuys.Skip(3))
             {
                 supportTasks.Add(Task.Run(async () => {
@@ -51,7 +72,11 @@ namespace Artifacts
                         Console.WriteLine($"Support role loop {guy.Name}");
                         await guy.MoveTo(MapContentType.Bank);
                         await guy.DepositAllItems();
-                        await guy.GatherItems("small_health_potion", 50, ignoreBank: true);
+
+                        var slot = Random.Shared.Next(2) == 1 ? ItemSlot.Utility1 : ItemSlot.Utility2;
+                        ItemSchema weapon = ChooseWeapon();
+                        ItemSchema potion = guy.ChoosePotion(monster, slot, weapon);
+                        await guy.CraftItems(potion, 25);
                     }
                 }));
             }
@@ -60,8 +85,16 @@ namespace Artifacts
             await FightLoop(topGuys.Take(3), boss);
         }
 
+        private ItemSchema ChooseWeapon()
+        {
+            var weapons = Items.Instance.GetAllItems().Values.Where(x => x.Type == "weapon");
+            return weapons.ElementAt(Random.Shared.Next(weapons.Count()));
+        }
+
         internal async Task FightLoop(IEnumerable<Character> enumerable, string boss)
         {
+            Console.WriteLine("Boss Fight!");
+
             var lostLastFight = 0;
             var losses = 0;
 
@@ -102,8 +135,8 @@ namespace Artifacts
 
                 try
                 {
-                    var participants = new List<string>(enumerable.Skip(1).Select(x => x.Name));
-                    var result = await enumerable.ElementAt(0).Fight(participants);
+                    var participants = new List<string>(enumerable.Take(2).Select(x => x.Name));
+                    var result = await enumerable.ElementAt(2).Fight(participants);
 
                     if (result.Data.Fight.Result == FightResult.Win)
                     {

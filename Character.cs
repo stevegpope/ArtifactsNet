@@ -2,6 +2,8 @@
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
+using static StackExchange.Redis.Role;
 
 namespace Artifacts
 {
@@ -660,6 +662,8 @@ namespace Artifacts
             var item = await Npcs.Instance.FindNpcItem(code);
             if (item != null && item.BuyPrice > 0)
             {
+                if (item.Npc == "tasks_trader") return 0;
+
                 Console.WriteLine($"Try to buy {total} {code} from NPC");
                 var maps = await Map.Instance.GetMapLayer(MapContentType.Npc, item.Npc);
                 while (maps.Data.Any())
@@ -1299,9 +1303,14 @@ namespace Artifacts
             }
 
             // No resting, go get food!
-            await GetFood();
+            var gotFood = await GetFood();
+            if (gotFood)
+            {
+                await EatSomething();
+                return true;
+            }
 
-            return await Rest();
+            return false;
         }
 
         private async Task<bool> EatSomething()
@@ -1839,9 +1848,15 @@ namespace Artifacts
 
             if (max == currentValue)
             {
-                if (currentItem == null && monster.Type == MonsterType.Boss)
+                if ((slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2) && 
+                    currentItem == null && monster.Type == MonsterType.Boss)
                 {
-                    await MakePotions(monster, slotType, weapon);
+                    ItemSchema potion = ChoosePotion(monster, slotType, weapon);
+                    var gathered = await GatherItems(potion.Code, 25);
+                    if (gathered > 0)
+                    {
+                        await Equip(potion.Code, slotType, gathered);
+                    }
                 }
 
                 // Special case for utilities. If the value is 0 unequip it
@@ -1886,11 +1901,11 @@ namespace Artifacts
 
                 var quantity = 1;
 
-                // Special case for utility slots, take 10 max
+                // Special case for utility slots, take 25 max
                 if (slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2)
                 {
                     var bankItem = bankItems.First(x => x.Code == bestBankItem.Code);
-                    quantity = Math.Min(10, bankItem.Quantity);
+                    quantity = Math.Min(25, bankItem.Quantity);
                 }
 
                 await MoveTo(MapContentType.Bank);
@@ -1907,53 +1922,45 @@ namespace Artifacts
             }
         }
 
-        internal async Task<int> MakePotions(MonsterSchema monster, ItemSlot slotType, ItemSchema weapon)
+        internal ItemSchema ChoosePotion(MonsterSchema monster, ItemSlot slotType, ItemSchema weapon)
         {
-            string potion = null;
-            var batchSize = 50;
+            var potions = GetRecipes("alchemy").Where(x => x.Level < Utils.Details[Name].Level);
+
             if (slotType == ItemSlot.Utility1)
             {
                 // Put healing potions in slot 1
-                var potions = GetRecipes("alchemy");
-                potion = potions.OrderByDescending(x => x.Level).Where(x => x.Level < Utils.Details[Name].Level && x.Effects.Any(y => y.Code == "restore")).FirstOrDefault().Code;
+                var potionChoices = potions.Where(x => x.Effects.Any(y => y.Code == "restore"));
+                var usablePotions = potionChoices.OrderByDescending(x => x.Level);
+                return usablePotions.First();
             }
             else if (slotType == ItemSlot.Utility2)
             {
                 // Put damage or poison potions in slot 2
-                var potions = GetRecipes("alchemy");
                 if (monster.Effects.Any(x => x.Code == "poison"))
                 {
-                    potion = potions.OrderByDescending(x => x.Level).Where(x => x.Level < Utils.Details[Name].Level && x.Effects.Any(y => y.Code == "antipoison")).FirstOrDefault().Code;
+                    var potionChoices = potions.Where(x => x.Effects.Any(y => y.Code == "antipoison"));
+                    var usablePotions = potionChoices.OrderByDescending(x => x.Level);
+                    return usablePotions.First();
                 }
                 else
                 {
-                    // These are one per fight
-                    batchSize = 15;
-
                     var max = 0.0;
-                    foreach(var potionElement in potions)
+                    ItemSchema potion = null;
+                    foreach (var potionElement in potions)
                     {
                         var value = potionElement.Effects.Sum(x => Items.AddBoost(weapon, monster, 10, x));
                         if (value > max)
                         {
-                            potion = potionElement.Code;
+                            potion = potionElement;
                             max = value;
                         }
                     }
+
+                    return potion;
                 }
             }
 
-            if (potion != null)
-            {
-                Console.WriteLine($"Gather {batchSize} {potion} for boss fight");
-                var gathered = await GatherItems(potion, batchSize);
-                if (gathered > 0)
-                {
-                    await Equip(potion, slotType, gathered);
-                }
-            }
-
-            return 0;
+            throw new ArgumentException($"Cannot choose potion for slot {slotType}");
         }
 
         private async Task<ItemSchema> GetBestItemFromBank(ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon)
