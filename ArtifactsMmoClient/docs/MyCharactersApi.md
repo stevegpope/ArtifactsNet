@@ -7,6 +7,7 @@ All URIs are relative to *http://localhost*
 | [**ActionAcceptNewTaskMyNameActionTaskNewPost**](MyCharactersApi.md#actionacceptnewtaskmynameactiontasknewpost) | **POST** /my/{name}/action/task/new | Action Accept New Task |
 | [**ActionBuyBankExpansionMyNameActionBankBuyExpansionPost**](MyCharactersApi.md#actionbuybankexpansionmynameactionbankbuyexpansionpost) | **POST** /my/{name}/action/bank/buy_expansion | Action Buy Bank Expansion |
 | [**ActionChangeSkinMyNameActionChangeSkinPost**](MyCharactersApi.md#actionchangeskinmynameactionchangeskinpost) | **POST** /my/{name}/action/change_skin | Action Change Skin |
+| [**ActionClaimPendingItemMyNameActionClaimItemIdPost**](MyCharactersApi.md#actionclaimpendingitemmynameactionclaimitemidpost) | **POST** /my/{name}/action/claim_item/{id} | Action Claim Pending Item |
 | [**ActionCompleteTaskMyNameActionTaskCompletePost**](MyCharactersApi.md#actioncompletetaskmynameactiontaskcompletepost) | **POST** /my/{name}/action/task/complete | Action Complete Task |
 | [**ActionCraftingMyNameActionCraftingPost**](MyCharactersApi.md#actioncraftingmynameactioncraftingpost) | **POST** /my/{name}/action/crafting | Action Crafting |
 | [**ActionDeleteItemMyNameActionDeletePost**](MyCharactersApi.md#actiondeleteitemmynameactiondeletepost) | **POST** /my/{name}/action/delete | Action Delete Item |
@@ -16,8 +17,10 @@ All URIs are relative to *http://localhost*
 | [**ActionFightMyNameActionFightPost**](MyCharactersApi.md#actionfightmynameactionfightpost) | **POST** /my/{name}/action/fight | Action Fight |
 | [**ActionGatheringMyNameActionGatheringPost**](MyCharactersApi.md#actiongatheringmynameactiongatheringpost) | **POST** /my/{name}/action/gathering | Action Gathering |
 | [**ActionGeBuyItemMyNameActionGrandexchangeBuyPost**](MyCharactersApi.md#actiongebuyitemmynameactiongrandexchangebuypost) | **POST** /my/{name}/action/grandexchange/buy | Action Ge Buy Item |
-| [**ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPost**](MyCharactersApi.md#actiongecancelsellordermynameactiongrandexchangecancelpost) | **POST** /my/{name}/action/grandexchange/cancel | Action Ge Cancel Sell Order |
-| [**ActionGeCreateSellOrderMyNameActionGrandexchangeSellPost**](MyCharactersApi.md#actiongecreatesellordermynameactiongrandexchangesellpost) | **POST** /my/{name}/action/grandexchange/sell | Action Ge Create Sell Order |
+| [**ActionGeCancelOrderMyNameActionGrandexchangeCancelPost**](MyCharactersApi.md#actiongecancelordermynameactiongrandexchangecancelpost) | **POST** /my/{name}/action/grandexchange/cancel | Action Ge Cancel Order |
+| [**ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPost**](MyCharactersApi.md#actiongecreatebuyordermynameactiongrandexchangecreatebuyorderpost) | **POST** /my/{name}/action/grandexchange/create-buy-order | Action Ge Create Buy Order |
+| [**ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPost**](MyCharactersApi.md#actiongecreatesellordermynameactiongrandexchangecreatesellorderpost) | **POST** /my/{name}/action/grandexchange/create-sell-order | Action Ge Create Sell Order |
+| [**ActionGeFillMyNameActionGrandexchangeFillPost**](MyCharactersApi.md#actiongefillmynameactiongrandexchangefillpost) | **POST** /my/{name}/action/grandexchange/fill | Action Ge Fill |
 | [**ActionGiveGoldMyNameActionGiveGoldPost**](MyCharactersApi.md#actiongivegoldmynameactiongivegoldpost) | **POST** /my/{name}/action/give/gold | Action Give Gold |
 | [**ActionGiveItemsMyNameActionGiveItemPost**](MyCharactersApi.md#actiongiveitemsmynameactiongiveitempost) | **POST** /my/{name}/action/give/item | Action Give Items |
 | [**ActionMoveMyNameActionMovePost**](MyCharactersApi.md#actionmovemynameactionmovepost) | **POST** /my/{name}/action/move | Action Move |
@@ -345,6 +348,112 @@ catch (ApiException e)
 | **499** | The character is in cooldown. |  -  |
 | **486** | An action is already in progress for this character. |  -  |
 | **550** | You cannot choose this skin because you do not own it. |  -  |
+| **422** | Request could not be processed due to an invalid payload. |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+<a id="actionclaimpendingitemmynameactionclaimitemidpost"></a>
+# **ActionClaimPendingItemMyNameActionClaimItemIdPost**
+> ClaimPendingItemResponseSchema ActionClaimPendingItemMyNameActionClaimItemIdPost (string name, string id)
+
+Action Claim Pending Item
+
+Claim a pending item with a specific character.
+
+### Example
+```csharp
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net.Http;
+using ArtifactsMmoClient.Api;
+using ArtifactsMmoClient.Client;
+using ArtifactsMmoClient.Model;
+
+namespace Example
+{
+    public class ActionClaimPendingItemMyNameActionClaimItemIdPostExample
+    {
+        public static void Main()
+        {
+            Configuration config = new Configuration();
+            config.BasePath = "http://localhost";
+            // Configure Bearer token for authorization: JWTBearer
+            config.AccessToken = "YOUR_BEARER_TOKEN";
+
+            // create instances of HttpClient, HttpClientHandler to be reused later with different Api classes
+            HttpClient httpClient = new HttpClient();
+            HttpClientHandler httpClientHandler = new HttpClientHandler();
+            var apiInstance = new MyCharactersApi(httpClient, config, httpClientHandler);
+            var name = "name_example";  // string | Name of your character.
+            var id = "id_example";  // string | The ID of the pending item to claim.
+
+            try
+            {
+                // Action Claim Pending Item
+                ClaimPendingItemResponseSchema result = apiInstance.ActionClaimPendingItemMyNameActionClaimItemIdPost(name, id);
+                Debug.WriteLine(result);
+            }
+            catch (ApiException  e)
+            {
+                Debug.Print("Exception when calling MyCharactersApi.ActionClaimPendingItemMyNameActionClaimItemIdPost: " + e.Message);
+                Debug.Print("Status Code: " + e.ErrorCode);
+                Debug.Print(e.StackTrace);
+            }
+        }
+    }
+}
+```
+
+#### Using the ActionClaimPendingItemMyNameActionClaimItemIdPostWithHttpInfo variant
+This returns an ApiResponse object which contains the response data, status code and headers.
+
+```csharp
+try
+{
+    // Action Claim Pending Item
+    ApiResponse<ClaimPendingItemResponseSchema> response = apiInstance.ActionClaimPendingItemMyNameActionClaimItemIdPostWithHttpInfo(name, id);
+    Debug.Write("Status Code: " + response.StatusCode);
+    Debug.Write("Response Headers: " + response.Headers);
+    Debug.Write("Response Body: " + response.Data);
+}
+catch (ApiException e)
+{
+    Debug.Print("Exception when calling MyCharactersApi.ActionClaimPendingItemMyNameActionClaimItemIdPostWithHttpInfo: " + e.Message);
+    Debug.Print("Status Code: " + e.ErrorCode);
+    Debug.Print(e.StackTrace);
+}
+```
+
+### Parameters
+
+| Name | Type | Description | Notes |
+|------|------|-------------|-------|
+| **name** | **string** | Name of your character. |  |
+| **id** | **string** | The ID of the pending item to claim. |  |
+
+### Return type
+
+[**ClaimPendingItemResponseSchema**](ClaimPendingItemResponseSchema.md)
+
+### Authorization
+
+[JWTBearer](../README.md#JWTBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Successfully claimed the pending item. |  -  |
+| **404** | Pending item not found. |  -  |
+| **498** | Character not found. |  -  |
+| **497** | The character&#39;s inventory is full. |  -  |
+| **499** | The character is in cooldown. |  -  |
+| **486** | An action is already in progress for this character. |  -  |
 | **422** | Request could not be processed due to an invalid payload. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
@@ -1319,13 +1428,13 @@ catch (ApiException e)
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-<a id="actiongecancelsellordermynameactiongrandexchangecancelpost"></a>
-# **ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPost**
-> GETransactionResponseSchema ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPost (string name, GECancelOrderSchema gECancelOrderSchema)
+<a id="actiongecancelordermynameactiongrandexchangecancelpost"></a>
+# **ActionGeCancelOrderMyNameActionGrandexchangeCancelPost**
+> GETransactionResponseSchema ActionGeCancelOrderMyNameActionGrandexchangeCancelPost (string name, GECancelOrderSchema gECancelOrderSchema)
 
-Action Ge Cancel Sell Order
+Action Ge Cancel Order
 
-Cancel a sell order at the Grand Exchange on the character's map.
+Cancel an order (sell or buy) at the Grand Exchange on the character's map.  For sell orders: Items are returned to your inventory. For buy orders: Gold is refunded to your character.
 
 ### Example
 ```csharp
@@ -1338,7 +1447,7 @@ using ArtifactsMmoClient.Model;
 
 namespace Example
 {
-    public class ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPostExample
+    public class ActionGeCancelOrderMyNameActionGrandexchangeCancelPostExample
     {
         public static void Main()
         {
@@ -1356,13 +1465,13 @@ namespace Example
 
             try
             {
-                // Action Ge Cancel Sell Order
-                GETransactionResponseSchema result = apiInstance.ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPost(name, gECancelOrderSchema);
+                // Action Ge Cancel Order
+                GETransactionResponseSchema result = apiInstance.ActionGeCancelOrderMyNameActionGrandexchangeCancelPost(name, gECancelOrderSchema);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
             {
-                Debug.Print("Exception when calling MyCharactersApi.ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPost: " + e.Message);
+                Debug.Print("Exception when calling MyCharactersApi.ActionGeCancelOrderMyNameActionGrandexchangeCancelPost: " + e.Message);
                 Debug.Print("Status Code: " + e.ErrorCode);
                 Debug.Print(e.StackTrace);
             }
@@ -1371,21 +1480,21 @@ namespace Example
 }
 ```
 
-#### Using the ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPostWithHttpInfo variant
+#### Using the ActionGeCancelOrderMyNameActionGrandexchangeCancelPostWithHttpInfo variant
 This returns an ApiResponse object which contains the response data, status code and headers.
 
 ```csharp
 try
 {
-    // Action Ge Cancel Sell Order
-    ApiResponse<GETransactionResponseSchema> response = apiInstance.ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPostWithHttpInfo(name, gECancelOrderSchema);
+    // Action Ge Cancel Order
+    ApiResponse<GETransactionResponseSchema> response = apiInstance.ActionGeCancelOrderMyNameActionGrandexchangeCancelPostWithHttpInfo(name, gECancelOrderSchema);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
 }
 catch (ApiException e)
 {
-    Debug.Print("Exception when calling MyCharactersApi.ActionGeCancelSellOrderMyNameActionGrandexchangeCancelPostWithHttpInfo: " + e.Message);
+    Debug.Print("Exception when calling MyCharactersApi.ActionGeCancelOrderMyNameActionGrandexchangeCancelPostWithHttpInfo: " + e.Message);
     Debug.Print("Status Code: " + e.ErrorCode);
     Debug.Print(e.StackTrace);
 }
@@ -1415,7 +1524,7 @@ catch (ApiException e)
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **200** | Your sell order has been successfully cancelled. |  -  |
+| **200** | Your order has been successfully cancelled. |  -  |
 | **598** | Grand Exchange not found on this map. |  -  |
 | **498** | Character not found. |  -  |
 | **497** | The character&#39;s inventory is full. |  -  |
@@ -1428,13 +1537,13 @@ catch (ApiException e)
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-<a id="actiongecreatesellordermynameactiongrandexchangesellpost"></a>
-# **ActionGeCreateSellOrderMyNameActionGrandexchangeSellPost**
-> GECreateOrderTransactionResponseSchema ActionGeCreateSellOrderMyNameActionGrandexchangeSellPost (string name, GEOrderCreationrSchema gEOrderCreationrSchema)
+<a id="actiongecreatebuyordermynameactiongrandexchangecreatebuyorderpost"></a>
+# **ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPost**
+> GECreateOrderTransactionResponseSchema ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPost (string name, GEBuyOrderCreationSchema gEBuyOrderCreationSchema)
 
-Action Ge Create Sell Order
+Action Ge Create Buy Order
 
-Create a sell order at the Grand Exchange on the character's map.  Please note there is a 3% listing tax, charged at the time of posting, on the total price.
+Create a buy order at the Grand Exchange on the character's map.  The total gold (price * quantity) is locked when creating the order. Other players can then sell items to fulfill your order. Items will be delivered to your pending items when the order is filled.
 
 ### Example
 ```csharp
@@ -1447,7 +1556,116 @@ using ArtifactsMmoClient.Model;
 
 namespace Example
 {
-    public class ActionGeCreateSellOrderMyNameActionGrandexchangeSellPostExample
+    public class ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPostExample
+    {
+        public static void Main()
+        {
+            Configuration config = new Configuration();
+            config.BasePath = "http://localhost";
+            // Configure Bearer token for authorization: JWTBearer
+            config.AccessToken = "YOUR_BEARER_TOKEN";
+
+            // create instances of HttpClient, HttpClientHandler to be reused later with different Api classes
+            HttpClient httpClient = new HttpClient();
+            HttpClientHandler httpClientHandler = new HttpClientHandler();
+            var apiInstance = new MyCharactersApi(httpClient, config, httpClientHandler);
+            var name = "name_example";  // string | Name of your character.
+            var gEBuyOrderCreationSchema = new GEBuyOrderCreationSchema(); // GEBuyOrderCreationSchema | 
+
+            try
+            {
+                // Action Ge Create Buy Order
+                GECreateOrderTransactionResponseSchema result = apiInstance.ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPost(name, gEBuyOrderCreationSchema);
+                Debug.WriteLine(result);
+            }
+            catch (ApiException  e)
+            {
+                Debug.Print("Exception when calling MyCharactersApi.ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPost: " + e.Message);
+                Debug.Print("Status Code: " + e.ErrorCode);
+                Debug.Print(e.StackTrace);
+            }
+        }
+    }
+}
+```
+
+#### Using the ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPostWithHttpInfo variant
+This returns an ApiResponse object which contains the response data, status code and headers.
+
+```csharp
+try
+{
+    // Action Ge Create Buy Order
+    ApiResponse<GECreateOrderTransactionResponseSchema> response = apiInstance.ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPostWithHttpInfo(name, gEBuyOrderCreationSchema);
+    Debug.Write("Status Code: " + response.StatusCode);
+    Debug.Write("Response Headers: " + response.Headers);
+    Debug.Write("Response Body: " + response.Data);
+}
+catch (ApiException e)
+{
+    Debug.Print("Exception when calling MyCharactersApi.ActionGeCreateBuyOrderMyNameActionGrandexchangeCreateBuyOrderPostWithHttpInfo: " + e.Message);
+    Debug.Print("Status Code: " + e.ErrorCode);
+    Debug.Print(e.StackTrace);
+}
+```
+
+### Parameters
+
+| Name | Type | Description | Notes |
+|------|------|-------------|-------|
+| **name** | **string** | Name of your character. |  |
+| **gEBuyOrderCreationSchema** | [**GEBuyOrderCreationSchema**](GEBuyOrderCreationSchema.md) |  |  |
+
+### Return type
+
+[**GECreateOrderTransactionResponseSchema**](GECreateOrderTransactionResponseSchema.md)
+
+### Authorization
+
+[JWTBearer](../README.md#JWTBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | The buy order has been successfully created. |  -  |
+| **498** | Character not found. |  -  |
+| **499** | The character is in cooldown. |  -  |
+| **486** | An action is already in progress for this character. |  -  |
+| **404** | Item not found. |  -  |
+| **492** | The character does not have enough gold. |  -  |
+| **433** | You cannot create more than 100 orders at the same time. |  -  |
+| **437** | This item cannot be sold. |  -  |
+| **598** | Grand Exchange not found on this map. |  -  |
+| **422** | Request could not be processed due to an invalid payload. |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+<a id="actiongecreatesellordermynameactiongrandexchangecreatesellorderpost"></a>
+# **ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPost**
+> GECreateOrderTransactionResponseSchema ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPost (string name, GEOrderCreationrSchema gEOrderCreationrSchema)
+
+Action Ge Create Sell Order
+
+Create a sell order at the Grand Exchange on the character's map.
+
+### Example
+```csharp
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net.Http;
+using ArtifactsMmoClient.Api;
+using ArtifactsMmoClient.Client;
+using ArtifactsMmoClient.Model;
+
+namespace Example
+{
+    public class ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPostExample
     {
         public static void Main()
         {
@@ -1466,12 +1684,12 @@ namespace Example
             try
             {
                 // Action Ge Create Sell Order
-                GECreateOrderTransactionResponseSchema result = apiInstance.ActionGeCreateSellOrderMyNameActionGrandexchangeSellPost(name, gEOrderCreationrSchema);
+                GECreateOrderTransactionResponseSchema result = apiInstance.ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPost(name, gEOrderCreationrSchema);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
             {
-                Debug.Print("Exception when calling MyCharactersApi.ActionGeCreateSellOrderMyNameActionGrandexchangeSellPost: " + e.Message);
+                Debug.Print("Exception when calling MyCharactersApi.ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPost: " + e.Message);
                 Debug.Print("Status Code: " + e.ErrorCode);
                 Debug.Print(e.StackTrace);
             }
@@ -1480,21 +1698,21 @@ namespace Example
 }
 ```
 
-#### Using the ActionGeCreateSellOrderMyNameActionGrandexchangeSellPostWithHttpInfo variant
+#### Using the ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPostWithHttpInfo variant
 This returns an ApiResponse object which contains the response data, status code and headers.
 
 ```csharp
 try
 {
     // Action Ge Create Sell Order
-    ApiResponse<GECreateOrderTransactionResponseSchema> response = apiInstance.ActionGeCreateSellOrderMyNameActionGrandexchangeSellPostWithHttpInfo(name, gEOrderCreationrSchema);
+    ApiResponse<GECreateOrderTransactionResponseSchema> response = apiInstance.ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPostWithHttpInfo(name, gEOrderCreationrSchema);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
 }
 catch (ApiException e)
 {
-    Debug.Print("Exception when calling MyCharactersApi.ActionGeCreateSellOrderMyNameActionGrandexchangeSellPostWithHttpInfo: " + e.Message);
+    Debug.Print("Exception when calling MyCharactersApi.ActionGeCreateSellOrderMyNameActionGrandexchangeCreateSellOrderPostWithHttpInfo: " + e.Message);
     Debug.Print("Status Code: " + e.ErrorCode);
     Debug.Print(e.StackTrace);
 }
@@ -1530,10 +1748,119 @@ catch (ApiException e)
 | **486** | An action is already in progress for this character. |  -  |
 | **404** | Item not found. |  -  |
 | **478** | Missing required item(s). |  -  |
-| **492** | The character does not have enough gold. |  -  |
 | **433** | You cannot create more than 100 orders at the same time. |  -  |
 | **437** | This item cannot be sold. |  -  |
 | **598** | Grand Exchange not found on this map. |  -  |
+| **422** | Request could not be processed due to an invalid payload. |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+<a id="actiongefillmynameactiongrandexchangefillpost"></a>
+# **ActionGeFillMyNameActionGrandexchangeFillPost**
+> GETransactionResponseSchema ActionGeFillMyNameActionGrandexchangeFillPost (string name, GEFillBuyOrderSchema gEFillBuyOrderSchema)
+
+Action Ge Fill
+
+Sell items to an existing buy order at the Grand Exchange on the character's map.  You will receive the gold immediately. The buyer will receive the items in their pending items.
+
+### Example
+```csharp
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net.Http;
+using ArtifactsMmoClient.Api;
+using ArtifactsMmoClient.Client;
+using ArtifactsMmoClient.Model;
+
+namespace Example
+{
+    public class ActionGeFillMyNameActionGrandexchangeFillPostExample
+    {
+        public static void Main()
+        {
+            Configuration config = new Configuration();
+            config.BasePath = "http://localhost";
+            // Configure Bearer token for authorization: JWTBearer
+            config.AccessToken = "YOUR_BEARER_TOKEN";
+
+            // create instances of HttpClient, HttpClientHandler to be reused later with different Api classes
+            HttpClient httpClient = new HttpClient();
+            HttpClientHandler httpClientHandler = new HttpClientHandler();
+            var apiInstance = new MyCharactersApi(httpClient, config, httpClientHandler);
+            var name = "name_example";  // string | Name of your character.
+            var gEFillBuyOrderSchema = new GEFillBuyOrderSchema(); // GEFillBuyOrderSchema | 
+
+            try
+            {
+                // Action Ge Fill
+                GETransactionResponseSchema result = apiInstance.ActionGeFillMyNameActionGrandexchangeFillPost(name, gEFillBuyOrderSchema);
+                Debug.WriteLine(result);
+            }
+            catch (ApiException  e)
+            {
+                Debug.Print("Exception when calling MyCharactersApi.ActionGeFillMyNameActionGrandexchangeFillPost: " + e.Message);
+                Debug.Print("Status Code: " + e.ErrorCode);
+                Debug.Print(e.StackTrace);
+            }
+        }
+    }
+}
+```
+
+#### Using the ActionGeFillMyNameActionGrandexchangeFillPostWithHttpInfo variant
+This returns an ApiResponse object which contains the response data, status code and headers.
+
+```csharp
+try
+{
+    // Action Ge Fill
+    ApiResponse<GETransactionResponseSchema> response = apiInstance.ActionGeFillMyNameActionGrandexchangeFillPostWithHttpInfo(name, gEFillBuyOrderSchema);
+    Debug.Write("Status Code: " + response.StatusCode);
+    Debug.Write("Response Headers: " + response.Headers);
+    Debug.Write("Response Body: " + response.Data);
+}
+catch (ApiException e)
+{
+    Debug.Print("Exception when calling MyCharactersApi.ActionGeFillMyNameActionGrandexchangeFillPostWithHttpInfo: " + e.Message);
+    Debug.Print("Status Code: " + e.ErrorCode);
+    Debug.Print(e.StackTrace);
+}
+```
+
+### Parameters
+
+| Name | Type | Description | Notes |
+|------|------|-------------|-------|
+| **name** | **string** | Name of your character. |  |
+| **gEFillBuyOrderSchema** | [**GEFillBuyOrderSchema**](GEFillBuyOrderSchema.md) |  |  |
+
+### Return type
+
+[**GETransactionResponseSchema**](GETransactionResponseSchema.md)
+
+### Authorization
+
+[JWTBearer](../README.md#JWTBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Successfully sold items to the buy order. |  -  |
+| **598** | Grand Exchange not found on this map. |  -  |
+| **498** | Character not found. |  -  |
+| **499** | The character is in cooldown. |  -  |
+| **436** | A transaction is already in progress for this order by another character. |  -  |
+| **486** | An action is already in progress for this character. |  -  |
+| **478** | Missing required item(s). |  -  |
+| **434** | This offer does not contain that many items. |  -  |
+| **435** | You cannot trade with yourself. |  -  |
+| **404** | Buy order not found. |  -  |
 | **422** | Request could not be processed due to an invalid payload. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

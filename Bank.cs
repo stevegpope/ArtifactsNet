@@ -45,7 +45,7 @@ namespace Artifacts
         {
             var orders = await Utils.ApiCall(async () =>
             {
-                return await _exchangeApi.GetGeSellOrdersGrandexchangeOrdersGetAsync(code);
+                return await _exchangeApi.GetGeOrdersGrandexchangeOrdersGetAsync(code);
             }) as DataPageGEOrderSchema;
 
             return orders.Data;
@@ -77,6 +77,12 @@ namespace Artifacts
         {
             var result = await Utils.ApiCall(async () => await _api.GetBankDetailsMyBankGetAsync());
             return (result as BankResponseSchema).Data;
+        }
+
+        internal async Task<List<PendingItemSchema>> GetPendingItems()
+        {
+            var result = await Utils.ApiCall(async () => await _api.GetPendingItemsMyPendingItemsGetAsync()) as DataPagePendingItemSchema;
+            return result.Data;
         }
     }
 }

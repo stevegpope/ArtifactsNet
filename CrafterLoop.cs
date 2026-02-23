@@ -53,9 +53,12 @@ namespace Artifacts
                 var bankItems = await Bank.Instance.GetItems();
 
                 int total = await CraftItems(craftAmount, level, items, bankItems);
+
+                // This is for alchemy.
+                // Nobody can craft anything until alchemy 5
                 if (total == 0)
                 {
-                    throw new Exception($"Nothing we can craft for skill {skill}");
+                    await _character.TrainGathering(5, skill);
                 }
 
                 // Go deposit the results in the bank
@@ -141,7 +144,7 @@ namespace Artifacts
             var bankItems = await Bank.Instance.GetItems();
             foreach (var item in items)
             {
-                if (item.SellPrice == null || item.SellPrice < 10)
+                if (item?.SellPrice == null || item.SellPrice < 10)
                 {
                     continue;
                 }

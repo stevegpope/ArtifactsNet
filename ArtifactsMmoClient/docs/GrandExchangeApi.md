@@ -4,17 +4,17 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |--------|--------------|-------------|
-| [**GetGeSellHistoryGrandexchangeHistoryCodeGet**](GrandExchangeApi.md#getgesellhistorygrandexchangehistorycodeget) | **GET** /grandexchange/history/{code} | Get Ge Sell History |
-| [**GetGeSellOrderGrandexchangeOrdersIdGet**](GrandExchangeApi.md#getgesellordergrandexchangeordersidget) | **GET** /grandexchange/orders/{id} | Get Ge Sell Order |
-| [**GetGeSellOrdersGrandexchangeOrdersGet**](GrandExchangeApi.md#getgesellordersgrandexchangeordersget) | **GET** /grandexchange/orders | Get Ge Sell Orders |
+| [**GetGeHistoryGrandexchangeHistoryCodeGet**](GrandExchangeApi.md#getgehistorygrandexchangehistorycodeget) | **GET** /grandexchange/history/{code} | Get Ge History |
+| [**GetGeOrderGrandexchangeOrdersIdGet**](GrandExchangeApi.md#getgeordergrandexchangeordersidget) | **GET** /grandexchange/orders/{id} | Get Ge Order |
+| [**GetGeOrdersGrandexchangeOrdersGet**](GrandExchangeApi.md#getgeordersgrandexchangeordersget) | **GET** /grandexchange/orders | Get Ge Orders |
 
-<a id="getgesellhistorygrandexchangehistorycodeget"></a>
-# **GetGeSellHistoryGrandexchangeHistoryCodeGet**
-> DataPageGeOrderHistorySchema GetGeSellHistoryGrandexchangeHistoryCodeGet (string code, string? seller = null, string? buyer = null, int? page = null, int? size = null)
+<a id="getgehistorygrandexchangehistorycodeget"></a>
+# **GetGeHistoryGrandexchangeHistoryCodeGet**
+> DataPageGeOrderHistorySchema GetGeHistoryGrandexchangeHistoryCodeGet (string code, string? account = null, int? page = null, int? size = null)
 
-Get Ge Sell History
+Get Ge History
 
-Fetch the sales history of the item for the last 7 days.
+Fetch the transaction history of the item for the last 7 days (buy and sell orders).
 
 ### Example
 ```csharp
@@ -27,7 +27,7 @@ using ArtifactsMmoClient.Model;
 
 namespace Example
 {
-    public class GetGeSellHistoryGrandexchangeHistoryCodeGetExample
+    public class GetGeHistoryGrandexchangeHistoryCodeGetExample
     {
         public static void Main()
         {
@@ -38,20 +38,19 @@ namespace Example
             HttpClientHandler httpClientHandler = new HttpClientHandler();
             var apiInstance = new GrandExchangeApi(httpClient, config, httpClientHandler);
             var code = "code_example";  // string | The code of the item.
-            var seller = "seller_example";  // string? | The seller (account name) of the item. (optional) 
-            var buyer = "buyer_example";  // string? | The buyer (account name) of the item. (optional) 
+            var account = "account_example";  // string? | Account involved in the transaction (matches either seller or buyer). (optional) 
             var page = 1;  // int? | Page number (optional)  (default to 1)
             var size = 50;  // int? | Page size (optional)  (default to 50)
 
             try
             {
-                // Get Ge Sell History
-                DataPageGeOrderHistorySchema result = apiInstance.GetGeSellHistoryGrandexchangeHistoryCodeGet(code, seller, buyer, page, size);
+                // Get Ge History
+                DataPageGeOrderHistorySchema result = apiInstance.GetGeHistoryGrandexchangeHistoryCodeGet(code, account, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
             {
-                Debug.Print("Exception when calling GrandExchangeApi.GetGeSellHistoryGrandexchangeHistoryCodeGet: " + e.Message);
+                Debug.Print("Exception when calling GrandExchangeApi.GetGeHistoryGrandexchangeHistoryCodeGet: " + e.Message);
                 Debug.Print("Status Code: " + e.ErrorCode);
                 Debug.Print(e.StackTrace);
             }
@@ -60,21 +59,21 @@ namespace Example
 }
 ```
 
-#### Using the GetGeSellHistoryGrandexchangeHistoryCodeGetWithHttpInfo variant
+#### Using the GetGeHistoryGrandexchangeHistoryCodeGetWithHttpInfo variant
 This returns an ApiResponse object which contains the response data, status code and headers.
 
 ```csharp
 try
 {
-    // Get Ge Sell History
-    ApiResponse<DataPageGeOrderHistorySchema> response = apiInstance.GetGeSellHistoryGrandexchangeHistoryCodeGetWithHttpInfo(code, seller, buyer, page, size);
+    // Get Ge History
+    ApiResponse<DataPageGeOrderHistorySchema> response = apiInstance.GetGeHistoryGrandexchangeHistoryCodeGetWithHttpInfo(code, account, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
 }
 catch (ApiException e)
 {
-    Debug.Print("Exception when calling GrandExchangeApi.GetGeSellHistoryGrandexchangeHistoryCodeGetWithHttpInfo: " + e.Message);
+    Debug.Print("Exception when calling GrandExchangeApi.GetGeHistoryGrandexchangeHistoryCodeGetWithHttpInfo: " + e.Message);
     Debug.Print("Status Code: " + e.ErrorCode);
     Debug.Print(e.StackTrace);
 }
@@ -85,8 +84,7 @@ catch (ApiException e)
 | Name | Type | Description | Notes |
 |------|------|-------------|-------|
 | **code** | **string** | The code of the item. |  |
-| **seller** | **string?** | The seller (account name) of the item. | [optional]  |
-| **buyer** | **string?** | The buyer (account name) of the item. | [optional]  |
+| **account** | **string?** | Account involved in the transaction (matches either seller or buyer). | [optional]  |
 | **page** | **int?** | Page number | [optional] [default to 1] |
 | **size** | **int?** | Page size | [optional] [default to 50] |
 
@@ -112,13 +110,13 @@ No authorization required
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-<a id="getgesellordergrandexchangeordersidget"></a>
-# **GetGeSellOrderGrandexchangeOrdersIdGet**
-> GEOrderResponseSchema GetGeSellOrderGrandexchangeOrdersIdGet (string id)
+<a id="getgeordergrandexchangeordersidget"></a>
+# **GetGeOrderGrandexchangeOrdersIdGet**
+> GEOrderResponseSchema GetGeOrderGrandexchangeOrdersIdGet (string id)
 
-Get Ge Sell Order
+Get Ge Order
 
-Retrieve the sell order of a item.
+Retrieve a specific order by ID.
 
 ### Example
 ```csharp
@@ -131,7 +129,7 @@ using ArtifactsMmoClient.Model;
 
 namespace Example
 {
-    public class GetGeSellOrderGrandexchangeOrdersIdGetExample
+    public class GetGeOrderGrandexchangeOrdersIdGetExample
     {
         public static void Main()
         {
@@ -145,13 +143,13 @@ namespace Example
 
             try
             {
-                // Get Ge Sell Order
-                GEOrderResponseSchema result = apiInstance.GetGeSellOrderGrandexchangeOrdersIdGet(id);
+                // Get Ge Order
+                GEOrderResponseSchema result = apiInstance.GetGeOrderGrandexchangeOrdersIdGet(id);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
             {
-                Debug.Print("Exception when calling GrandExchangeApi.GetGeSellOrderGrandexchangeOrdersIdGet: " + e.Message);
+                Debug.Print("Exception when calling GrandExchangeApi.GetGeOrderGrandexchangeOrdersIdGet: " + e.Message);
                 Debug.Print("Status Code: " + e.ErrorCode);
                 Debug.Print(e.StackTrace);
             }
@@ -160,21 +158,21 @@ namespace Example
 }
 ```
 
-#### Using the GetGeSellOrderGrandexchangeOrdersIdGetWithHttpInfo variant
+#### Using the GetGeOrderGrandexchangeOrdersIdGetWithHttpInfo variant
 This returns an ApiResponse object which contains the response data, status code and headers.
 
 ```csharp
 try
 {
-    // Get Ge Sell Order
-    ApiResponse<GEOrderResponseSchema> response = apiInstance.GetGeSellOrderGrandexchangeOrdersIdGetWithHttpInfo(id);
+    // Get Ge Order
+    ApiResponse<GEOrderResponseSchema> response = apiInstance.GetGeOrderGrandexchangeOrdersIdGetWithHttpInfo(id);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
 }
 catch (ApiException e)
 {
-    Debug.Print("Exception when calling GrandExchangeApi.GetGeSellOrderGrandexchangeOrdersIdGetWithHttpInfo: " + e.Message);
+    Debug.Print("Exception when calling GrandExchangeApi.GetGeOrderGrandexchangeOrdersIdGetWithHttpInfo: " + e.Message);
     Debug.Print("Status Code: " + e.ErrorCode);
     Debug.Print(e.StackTrace);
 }
@@ -208,13 +206,13 @@ No authorization required
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-<a id="getgesellordersgrandexchangeordersget"></a>
-# **GetGeSellOrdersGrandexchangeOrdersGet**
-> DataPageGEOrderSchema GetGeSellOrdersGrandexchangeOrdersGet (string? code = null, string? seller = null, int? page = null, int? size = null)
+<a id="getgeordersgrandexchangeordersget"></a>
+# **GetGeOrdersGrandexchangeOrdersGet**
+> DataPageGEOrderSchema GetGeOrdersGrandexchangeOrdersGet (string? code = null, string? account = null, GEOrderType? type = null, int? page = null, int? size = null)
 
-Get Ge Sell Orders
+Get Ge Orders
 
-Fetch all sell orders.
+Fetch all orders (sell and buy orders).  Use the `type` parameter to filter by order type; when using `account`, `type` is required to decide whether to match seller or buyer.
 
 ### Example
 ```csharp
@@ -227,7 +225,7 @@ using ArtifactsMmoClient.Model;
 
 namespace Example
 {
-    public class GetGeSellOrdersGrandexchangeOrdersGetExample
+    public class GetGeOrdersGrandexchangeOrdersGetExample
     {
         public static void Main()
         {
@@ -238,19 +236,20 @@ namespace Example
             HttpClientHandler httpClientHandler = new HttpClientHandler();
             var apiInstance = new GrandExchangeApi(httpClient, config, httpClientHandler);
             var code = "code_example";  // string? | The code of the item. (optional) 
-            var seller = "seller_example";  // string? | The seller (account name) of the item. (optional) 
+            var account = "account_example";  // string? | The account that sells or buys items. (optional) 
+            var type = new GEOrderType?(); // GEOrderType? | Filter by order type (sell or buy). (optional) 
             var page = 1;  // int? | Page number (optional)  (default to 1)
             var size = 50;  // int? | Page size (optional)  (default to 50)
 
             try
             {
-                // Get Ge Sell Orders
-                DataPageGEOrderSchema result = apiInstance.GetGeSellOrdersGrandexchangeOrdersGet(code, seller, page, size);
+                // Get Ge Orders
+                DataPageGEOrderSchema result = apiInstance.GetGeOrdersGrandexchangeOrdersGet(code, account, type, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
             {
-                Debug.Print("Exception when calling GrandExchangeApi.GetGeSellOrdersGrandexchangeOrdersGet: " + e.Message);
+                Debug.Print("Exception when calling GrandExchangeApi.GetGeOrdersGrandexchangeOrdersGet: " + e.Message);
                 Debug.Print("Status Code: " + e.ErrorCode);
                 Debug.Print(e.StackTrace);
             }
@@ -259,21 +258,21 @@ namespace Example
 }
 ```
 
-#### Using the GetGeSellOrdersGrandexchangeOrdersGetWithHttpInfo variant
+#### Using the GetGeOrdersGrandexchangeOrdersGetWithHttpInfo variant
 This returns an ApiResponse object which contains the response data, status code and headers.
 
 ```csharp
 try
 {
-    // Get Ge Sell Orders
-    ApiResponse<DataPageGEOrderSchema> response = apiInstance.GetGeSellOrdersGrandexchangeOrdersGetWithHttpInfo(code, seller, page, size);
+    // Get Ge Orders
+    ApiResponse<DataPageGEOrderSchema> response = apiInstance.GetGeOrdersGrandexchangeOrdersGetWithHttpInfo(code, account, type, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
 }
 catch (ApiException e)
 {
-    Debug.Print("Exception when calling GrandExchangeApi.GetGeSellOrdersGrandexchangeOrdersGetWithHttpInfo: " + e.Message);
+    Debug.Print("Exception when calling GrandExchangeApi.GetGeOrdersGrandexchangeOrdersGetWithHttpInfo: " + e.Message);
     Debug.Print("Status Code: " + e.ErrorCode);
     Debug.Print(e.StackTrace);
 }
@@ -284,7 +283,8 @@ catch (ApiException e)
 | Name | Type | Description | Notes |
 |------|------|-------------|-------|
 | **code** | **string?** | The code of the item. | [optional]  |
-| **seller** | **string?** | The seller (account name) of the item. | [optional]  |
+| **account** | **string?** | The account that sells or buys items. | [optional]  |
+| **type** | [**GEOrderType?**](GEOrderType?.md) | Filter by order type (sell or buy). | [optional]  |
 | **page** | **int?** | Page number | [optional] [default to 1] |
 | **size** | **int?** | Page size | [optional] [default to 50] |
 

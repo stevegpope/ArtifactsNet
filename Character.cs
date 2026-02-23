@@ -233,6 +233,8 @@ namespace Artifacts
             var gathered = 0;
             foreach (var component in item.Craft.Items)
             {
+                gathered = 0;
+
                 if (index > 0)
                 {
                     await DropOffNonComponents(item);
@@ -686,12 +688,12 @@ namespace Artifacts
                             continue;
                         }
 
-                        var remaining = item.BuyPrice.Value * total;
+                        var remaining = item.BuyPrice * total;
 
                         while (remaining > 0)
                         {
-                            Console.WriteLine($"Gather {item.BuyPrice.Value * total} {item.Currency} to buy from NPC");
-                            var gathered = await GatherItems(item.Currency, item.BuyPrice.Value * total);
+                            Console.WriteLine($"Gather {item.BuyPrice * total} {item.Currency} to buy from NPC");
+                            var gathered = await GatherItems(item.Currency, item.BuyPrice * total);
                             if (gathered > 0)
                             {
                                 remaining -= gathered;
@@ -825,6 +827,7 @@ namespace Artifacts
 
         internal async Task TrainGathering(int level, string skill, ItemSchema doNotUse = null)
         {
+            Console.WriteLine($"Train {skill} to level {level}");
             var items = Items.Instance.GetAllItems();
             var gatherItems = items.Where(i => i.Value.Type == "resource" && i.Value.Subtype == skill);
 
@@ -1968,14 +1971,8 @@ namespace Artifacts
             ItemSchema bestItem = null;
             foreach (var bankItem in bankItems)
             {
-                if (slotType == ItemSlot.Utility2 && bankItem.Code == Utils.Details[Name].Utility1Slot)
+                if (MatchesUtilitySlot(slotType, bankItem.Code))
                 {
-                    // Special case: we cannot have the same item in both utility slots
-                    continue;
-                }
-                if (slotType == ItemSlot.Utility2 && bankItem.Code == Utils.Details[Name].Utility1Slot)
-                {
-                    // Special case: we cannot have the same item in both utility slots
                     continue;
                 }
 
@@ -2007,12 +2004,7 @@ namespace Artifacts
                     continue;
                 }
 
-                if (slotType == ItemSlot.Utility2 && inventoryItem.Code == Utils.Details[Name].Utility1Slot)
-                {
-                    // Special case: we cannot have the same item in both utility slots
-                    continue;
-                }
-                if (slotType == ItemSlot.Utility1 && inventoryItem.Code == Utils.Details[Name].Utility2Slot)
+                if (MatchesUtilitySlot(slotType, inventoryItem.Code))
                 {
                     // Special case: we cannot have the same item in both utility slots
                     continue;
@@ -2038,6 +2030,39 @@ namespace Artifacts
                 }
             }
             return bestItem;
+        }
+
+        private bool MatchesUtilitySlot(ItemSlot slotType, string code)
+        {
+            // Special case: we cannot have the same item in both utility slots
+            if (slotType == ItemSlot.Utility2 && code == Utils.Details[Name].Utility1Slot)
+            {
+                return true;
+            }
+            else if (slotType == ItemSlot.Utility1 && code == Utils.Details[Name].Utility2Slot)
+            {
+                return true;
+            }
+
+            // Special case: we cannot have the same item in any artifact slots
+            if (slotType == ItemSlot.Artifact1 && 
+                (code == Utils.Details[Name].Artifact2Slot|| code == Utils.Details[Name].Artifact3Slot))
+            {
+                return true;
+            }
+            else if (slotType == ItemSlot.Artifact2 &&
+                (code == Utils.Details[Name].Artifact1Slot || code == Utils.Details[Name].Artifact3Slot))
+            {
+                // Special case: we cannot have the same item in both utility slots
+                return true;
+            }
+            else if (slotType == ItemSlot.Artifact3 &&
+                (code == Utils.Details[Name].Artifact1Slot || code == Utils.Details[Name].Artifact2Slot))
+            {
+                return true; 
+            }
+
+            return false;
         }
 
         internal async Task<EquipmentResponseSchema> Unequip(ItemSlot slotType)
@@ -2170,6 +2195,13 @@ namespace Artifacts
             {
                 Console.WriteLine(ex.ErrorContent);
             }
+        }
+
+        internal async Task<ClaimPendingItemDataSchema> ClaimItems(string id)
+        {
+            var result = await Utils.ApiCall(async () => await _api.ActionClaimPendingItemMyNameActionClaimItemIdPostAsync(Name, id));
+            var claim = result as ClaimPendingItemResponseSchema;
+            return claim.Data ;
         }
     }
 }

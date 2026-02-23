@@ -1,4 +1,5 @@
 # ArtifactsMmoClient.Model.GEOrderCreationrSchema
+Schema for creating a sell order.
 
 ## Properties
 

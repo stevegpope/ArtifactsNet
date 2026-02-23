@@ -5,7 +5,8 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Order id. | 
-**Seller** | **string** | Seller account name. | 
+**Type** | **GEOrderType** | Order type (sell or buy). | [optional] 
+**Account** | **string** | Account linked to the order. | [optional] 
 **Code** | **string** | Item code. | 
 **Quantity** | **int** | Item quantity. | 
 **Price** | **int** | Item price per unit. | 

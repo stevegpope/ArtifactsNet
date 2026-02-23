@@ -210,7 +210,7 @@ No authorization required
 
 Spawn Event
 
-Spawn a specific event by code consuming 1 event token.  Rules:   - Maximum active events defined by utils.config.max_active_events().   - Event must not already be active.   - Member or founder account required.
+Spawn a specific event by consuming 1 event token. Member or founder account required.
 
 ### Example
 ```csharp
@@ -301,7 +301,6 @@ catch (ApiException e)
 | **200** | Successfully fetched data. |  -  |
 | **563** | Insufficient event tokens. You need at least 1 event token to spawn an event. |  -  |
 | **564** | Event not found or already active. |  -  |
-| **451** | Access denied, you must be a member to do that. |  -  |
 | **422** | Request could not be processed due to an invalid payload. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

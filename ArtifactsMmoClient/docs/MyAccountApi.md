@@ -8,8 +8,9 @@ All URIs are relative to *http://localhost*
 | [**GetAccountDetailsMyDetailsGet**](MyAccountApi.md#getaccountdetailsmydetailsget) | **GET** /my/details | Get Account Details |
 | [**GetBankDetailsMyBankGet**](MyAccountApi.md#getbankdetailsmybankget) | **GET** /my/bank | Get Bank Details |
 | [**GetBankItemsMyBankItemsGet**](MyAccountApi.md#getbankitemsmybankitemsget) | **GET** /my/bank/items | Get Bank Items |
-| [**GetGeSellHistoryMyGrandexchangeHistoryGet**](MyAccountApi.md#getgesellhistorymygrandexchangehistoryget) | **GET** /my/grandexchange/history | Get Ge Sell History |
-| [**GetGeSellOrdersMyGrandexchangeOrdersGet**](MyAccountApi.md#getgesellordersmygrandexchangeordersget) | **GET** /my/grandexchange/orders | Get Ge Sell Orders |
+| [**GetGeHistoryMyGrandexchangeHistoryGet**](MyAccountApi.md#getgehistorymygrandexchangehistoryget) | **GET** /my/grandexchange/history | Get Ge History |
+| [**GetGeOrdersMyGrandexchangeOrdersGet**](MyAccountApi.md#getgeordersmygrandexchangeordersget) | **GET** /my/grandexchange/orders | Get Ge Orders |
+| [**GetPendingItemsMyPendingItemsGet**](MyAccountApi.md#getpendingitemsmypendingitemsget) | **GET** /my/pending-items | Get Pending Items |
 
 <a id="changepasswordmychangepasswordpost"></a>
 # **ChangePasswordMyChangePasswordPost**
@@ -294,7 +295,7 @@ This endpoint does not need any parameter.
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **200** | Successfully fetched bank details. |  -  |
+| **200** | Successfully fetched data. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
@@ -400,13 +401,13 @@ catch (ApiException e)
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-<a id="getgesellhistorymygrandexchangehistoryget"></a>
-# **GetGeSellHistoryMyGrandexchangeHistoryGet**
-> DataPageGeOrderHistorySchema GetGeSellHistoryMyGrandexchangeHistoryGet (string? id = null, string? code = null, int? page = null, int? size = null)
+<a id="getgehistorymygrandexchangehistoryget"></a>
+# **GetGeHistoryMyGrandexchangeHistoryGet**
+> DataPageGeOrderHistorySchema GetGeHistoryMyGrandexchangeHistoryGet (string? id = null, string? code = null, int? page = null, int? size = null)
 
-Get Ge Sell History
+Get Ge History
 
-Fetch your sales history of the last 7 days.
+Fetch your transaction history of the last 7 days (buy and sell orders).
 
 ### Example
 ```csharp
@@ -419,7 +420,7 @@ using ArtifactsMmoClient.Model;
 
 namespace Example
 {
-    public class GetGeSellHistoryMyGrandexchangeHistoryGetExample
+    public class GetGeHistoryMyGrandexchangeHistoryGetExample
     {
         public static void Main()
         {
@@ -439,13 +440,13 @@ namespace Example
 
             try
             {
-                // Get Ge Sell History
-                DataPageGeOrderHistorySchema result = apiInstance.GetGeSellHistoryMyGrandexchangeHistoryGet(id, code, page, size);
+                // Get Ge History
+                DataPageGeOrderHistorySchema result = apiInstance.GetGeHistoryMyGrandexchangeHistoryGet(id, code, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
             {
-                Debug.Print("Exception when calling MyAccountApi.GetGeSellHistoryMyGrandexchangeHistoryGet: " + e.Message);
+                Debug.Print("Exception when calling MyAccountApi.GetGeHistoryMyGrandexchangeHistoryGet: " + e.Message);
                 Debug.Print("Status Code: " + e.ErrorCode);
                 Debug.Print(e.StackTrace);
             }
@@ -454,21 +455,21 @@ namespace Example
 }
 ```
 
-#### Using the GetGeSellHistoryMyGrandexchangeHistoryGetWithHttpInfo variant
+#### Using the GetGeHistoryMyGrandexchangeHistoryGetWithHttpInfo variant
 This returns an ApiResponse object which contains the response data, status code and headers.
 
 ```csharp
 try
 {
-    // Get Ge Sell History
-    ApiResponse<DataPageGeOrderHistorySchema> response = apiInstance.GetGeSellHistoryMyGrandexchangeHistoryGetWithHttpInfo(id, code, page, size);
+    // Get Ge History
+    ApiResponse<DataPageGeOrderHistorySchema> response = apiInstance.GetGeHistoryMyGrandexchangeHistoryGetWithHttpInfo(id, code, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
 }
 catch (ApiException e)
 {
-    Debug.Print("Exception when calling MyAccountApi.GetGeSellHistoryMyGrandexchangeHistoryGetWithHttpInfo: " + e.Message);
+    Debug.Print("Exception when calling MyAccountApi.GetGeHistoryMyGrandexchangeHistoryGetWithHttpInfo: " + e.Message);
     Debug.Print("Status Code: " + e.ErrorCode);
     Debug.Print(e.StackTrace);
 }
@@ -504,13 +505,13 @@ catch (ApiException e)
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-<a id="getgesellordersmygrandexchangeordersget"></a>
-# **GetGeSellOrdersMyGrandexchangeOrdersGet**
-> DataPageGEOrderSchema GetGeSellOrdersMyGrandexchangeOrdersGet (string? code = null, int? page = null, int? size = null)
+<a id="getgeordersmygrandexchangeordersget"></a>
+# **GetGeOrdersMyGrandexchangeOrdersGet**
+> DataPageGEOrderSchema GetGeOrdersMyGrandexchangeOrdersGet (string? code = null, GEOrderType? type = null, int? page = null, int? size = null)
 
-Get Ge Sell Orders
+Get Ge Orders
 
-Fetch your sell orders details.
+Fetch your orders details (sell and buy orders).
 
 ### Example
 ```csharp
@@ -523,7 +524,7 @@ using ArtifactsMmoClient.Model;
 
 namespace Example
 {
-    public class GetGeSellOrdersMyGrandexchangeOrdersGetExample
+    public class GetGeOrdersMyGrandexchangeOrdersGetExample
     {
         public static void Main()
         {
@@ -537,18 +538,19 @@ namespace Example
             HttpClientHandler httpClientHandler = new HttpClientHandler();
             var apiInstance = new MyAccountApi(httpClient, config, httpClientHandler);
             var code = "code_example";  // string? | The code of the item. (optional) 
+            var type = new GEOrderType?(); // GEOrderType? | Filter by order type (sell or buy). (optional) 
             var page = 1;  // int? | Page number (optional)  (default to 1)
             var size = 50;  // int? | Page size (optional)  (default to 50)
 
             try
             {
-                // Get Ge Sell Orders
-                DataPageGEOrderSchema result = apiInstance.GetGeSellOrdersMyGrandexchangeOrdersGet(code, page, size);
+                // Get Ge Orders
+                DataPageGEOrderSchema result = apiInstance.GetGeOrdersMyGrandexchangeOrdersGet(code, type, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
             {
-                Debug.Print("Exception when calling MyAccountApi.GetGeSellOrdersMyGrandexchangeOrdersGet: " + e.Message);
+                Debug.Print("Exception when calling MyAccountApi.GetGeOrdersMyGrandexchangeOrdersGet: " + e.Message);
                 Debug.Print("Status Code: " + e.ErrorCode);
                 Debug.Print(e.StackTrace);
             }
@@ -557,21 +559,21 @@ namespace Example
 }
 ```
 
-#### Using the GetGeSellOrdersMyGrandexchangeOrdersGetWithHttpInfo variant
+#### Using the GetGeOrdersMyGrandexchangeOrdersGetWithHttpInfo variant
 This returns an ApiResponse object which contains the response data, status code and headers.
 
 ```csharp
 try
 {
-    // Get Ge Sell Orders
-    ApiResponse<DataPageGEOrderSchema> response = apiInstance.GetGeSellOrdersMyGrandexchangeOrdersGetWithHttpInfo(code, page, size);
+    // Get Ge Orders
+    ApiResponse<DataPageGEOrderSchema> response = apiInstance.GetGeOrdersMyGrandexchangeOrdersGetWithHttpInfo(code, type, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
 }
 catch (ApiException e)
 {
-    Debug.Print("Exception when calling MyAccountApi.GetGeSellOrdersMyGrandexchangeOrdersGetWithHttpInfo: " + e.Message);
+    Debug.Print("Exception when calling MyAccountApi.GetGeOrdersMyGrandexchangeOrdersGetWithHttpInfo: " + e.Message);
     Debug.Print("Status Code: " + e.ErrorCode);
     Debug.Print(e.StackTrace);
 }
@@ -582,6 +584,7 @@ catch (ApiException e)
 | Name | Type | Description | Notes |
 |------|------|-------------|-------|
 | **code** | **string?** | The code of the item. | [optional]  |
+| **type** | [**GEOrderType?**](GEOrderType?.md) | Filter by order type (sell or buy). | [optional]  |
 | **page** | **int?** | Page number | [optional] [default to 1] |
 | **size** | **int?** | Page size | [optional] [default to 50] |
 
@@ -603,6 +606,106 @@ catch (ApiException e)
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | Successfully fetched data. |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+<a id="getpendingitemsmypendingitemsget"></a>
+# **GetPendingItemsMyPendingItemsGet**
+> DataPagePendingItemSchema GetPendingItemsMyPendingItemsGet (int? page = null, int? size = null)
+
+Get Pending Items
+
+Retrieve all unclaimed pending items for your account.  These are items from various sources (achievements, grand exchange, events, etc.) that can be claimed by any character on your account using /my/{name}/action/claim/{id}.
+
+### Example
+```csharp
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net.Http;
+using ArtifactsMmoClient.Api;
+using ArtifactsMmoClient.Client;
+using ArtifactsMmoClient.Model;
+
+namespace Example
+{
+    public class GetPendingItemsMyPendingItemsGetExample
+    {
+        public static void Main()
+        {
+            Configuration config = new Configuration();
+            config.BasePath = "http://localhost";
+            // Configure Bearer token for authorization: JWTBearer
+            config.AccessToken = "YOUR_BEARER_TOKEN";
+
+            // create instances of HttpClient, HttpClientHandler to be reused later with different Api classes
+            HttpClient httpClient = new HttpClient();
+            HttpClientHandler httpClientHandler = new HttpClientHandler();
+            var apiInstance = new MyAccountApi(httpClient, config, httpClientHandler);
+            var page = 1;  // int? | Page number (optional)  (default to 1)
+            var size = 50;  // int? | Page size (optional)  (default to 50)
+
+            try
+            {
+                // Get Pending Items
+                DataPagePendingItemSchema result = apiInstance.GetPendingItemsMyPendingItemsGet(page, size);
+                Debug.WriteLine(result);
+            }
+            catch (ApiException  e)
+            {
+                Debug.Print("Exception when calling MyAccountApi.GetPendingItemsMyPendingItemsGet: " + e.Message);
+                Debug.Print("Status Code: " + e.ErrorCode);
+                Debug.Print(e.StackTrace);
+            }
+        }
+    }
+}
+```
+
+#### Using the GetPendingItemsMyPendingItemsGetWithHttpInfo variant
+This returns an ApiResponse object which contains the response data, status code and headers.
+
+```csharp
+try
+{
+    // Get Pending Items
+    ApiResponse<DataPagePendingItemSchema> response = apiInstance.GetPendingItemsMyPendingItemsGetWithHttpInfo(page, size);
+    Debug.Write("Status Code: " + response.StatusCode);
+    Debug.Write("Response Headers: " + response.Headers);
+    Debug.Write("Response Body: " + response.Data);
+}
+catch (ApiException e)
+{
+    Debug.Print("Exception when calling MyAccountApi.GetPendingItemsMyPendingItemsGetWithHttpInfo: " + e.Message);
+    Debug.Print("Status Code: " + e.ErrorCode);
+    Debug.Print(e.StackTrace);
+}
+```
+
+### Parameters
+
+| Name | Type | Description | Notes |
+|------|------|-------------|-------|
+| **page** | **int?** | Page number | [optional] [default to 1] |
+| **size** | **int?** | Page size | [optional] [default to 50] |
+
+### Return type
+
+[**DataPagePendingItemSchema**](DataPagePendingItemSchema.md)
+
+### Authorization
+
+[JWTBearer](../README.md#JWTBearer)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Successfully fetched pending items. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

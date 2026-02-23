@@ -1,4 +1,5 @@
 # ArtifactsMmoClient.Model.GEBuyOrderSchema
+Schema for buying from a sell order.
 
 ## Properties
 

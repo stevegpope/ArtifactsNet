@@ -1,7 +1,6 @@
 openapi: 3.1.0
 info:
-  description: |2
-
+  description: |-
     Artifacts is an API-based MMO game where you can manage 5 characters to explore, fight, gather resources, craft items and much more.
 
     Website: https://artifactsmmo.com/
@@ -10,7 +9,7 @@ info:
 
     OpenAPI Spec: https://api.artifactsmmo.com/openapi.json
   title: Artifacts API
-  version: 6.1.0
+  version: 7.0.0
 servers:
 - url: /
 paths:
@@ -38,7 +37,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BankResponseSchema"
-          description: Successfully fetched bank details.
+          description: Successfully fetched data.
       security:
       - JWTBearer: []
       summary: Get Bank Details
@@ -99,8 +98,8 @@ paths:
       - My account
   /my/grandexchange/orders:
     get:
-      description: Fetch your sell orders details.
-      operationId: get_ge_sell_orders_my_grandexchange_orders_get
+      description: Fetch your orders details (sell and buy orders).
+      operationId: get_ge_orders_my_grandexchange_orders_get
       parameters:
       - description: The code of the item.
         explode: true
@@ -112,6 +111,17 @@ paths:
           pattern: "^[a-zA-Z0-9_-]+$"
           title: Item code
           type: string
+        style: form
+      - description: Filter by order type (sell or buy).
+        explode: true
+        in: query
+        name: type
+        required: false
+        schema:
+          allOf:
+          - $ref: "#/components/schemas/GEOrderType"
+          description: Filter by order type (sell or buy).
+          title: Order type
         style: form
       - description: Page number
         explode: true
@@ -147,13 +157,14 @@ paths:
           description: Successfully fetched data.
       security:
       - JWTBearer: []
-      summary: Get Ge Sell Orders
+      summary: Get Ge Orders
       tags:
       - My account
   /my/grandexchange/history:
     get:
-      description: Fetch your sales history of the last 7 days.
-      operationId: get_ge_sell_history_my_grandexchange_history_get
+      description: Fetch your transaction history of the last 7 days (buy and sell
+        orders).
+      operationId: get_ge_history_my_grandexchange_history_get
       parameters:
       - description: Order ID to search in your history.
         explode: true
@@ -211,7 +222,7 @@ paths:
           description: Successfully fetched data.
       security:
       - JWTBearer: []
-      summary: Get Ge Sell History
+      summary: Get Ge History
       tags:
       - My account
   /my/details:
@@ -284,6 +295,52 @@ paths:
       security:
       - JWTBearer: []
       summary: Change Password
+      tags:
+      - My account
+  /my/pending-items:
+    get:
+      description: |-
+        Retrieve all unclaimed pending items for your account.
+
+        These are items from various sources (achievements, grand exchange, events, etc.)
+        that can be claimed by any character on your account using /my/{name}/action/claim/{id}.
+      operationId: get_pending_items_my_pending_items_get
+      parameters:
+      - description: Page number
+        explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          default: 1
+          description: Page number
+          minimum: 1
+          title: Page
+          type: integer
+        style: form
+      - description: Page size
+        explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          default: 50
+          description: Page size
+          maximum: 100
+          minimum: 1
+          title: Size
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPage_PendingItemSchema_"
+          description: Successfully fetched pending items.
+      security:
+      - JWTBearer: []
+      summary: Get Pending Items
       tags:
       - My account
   /my/{name}/action/move:
@@ -2467,12 +2524,10 @@ paths:
       summary: Action Ge Buy Item
       tags:
       - My characters
-  /my/{name}/action/grandexchange/sell:
+  /my/{name}/action/grandexchange/create-sell-order:
     post:
-      description: "Create a sell order at the Grand Exchange on the character's map.\
-        \ \nPlease note there is a 3% listing tax, charged at the time of posting,\
-        \ on the total price."
-      operationId: action_ge_create_sell_order_my__name__action_grandexchange_sell_post
+      description: Create a sell order at the Grand Exchange on the character's map.
+      operationId: action_ge_create_sell_order_my__name__action_grandexchange_create_sell_order_post
       parameters:
       - description: Name of your character.
         explode: false
@@ -2548,16 +2603,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
           description: Missing required item(s).
-        "492":
-          content:
-            application/json:
-              example:
-                error:
-                  code: 492
-                  message: The character does not have enough gold.
-              schema:
-                $ref: "#/components/schemas/ErrorResponseSchema"
-          description: The character does not have enough gold.
         "433":
           content:
             application/json:
@@ -2608,8 +2653,12 @@ paths:
       - My characters
   /my/{name}/action/grandexchange/cancel:
     post:
-      description: Cancel a sell order at the Grand Exchange on the character's map.
-      operationId: action_ge_cancel_sell_order_my__name__action_grandexchange_cancel_post
+      description: |-
+        Cancel an order (sell or buy) at the Grand Exchange on the character's map.
+
+        For sell orders: Items are returned to your inventory.
+        For buy orders: Gold is refunded to your character.
+      operationId: action_ge_cancel_order_my__name__action_grandexchange_cancel_post
       parameters:
       - description: Name of your character.
         explode: false
@@ -2634,7 +2683,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GETransactionResponseSchema"
-          description: Your sell order has been successfully cancelled.
+          description: Your order has been successfully cancelled.
         "598":
           content:
             application/json:
@@ -2732,7 +2781,282 @@ paths:
           description: Request could not be processed due to an invalid payload.
       security:
       - JWTBearer: []
-      summary: Action Ge Cancel Sell Order
+      summary: Action Ge Cancel Order
+      tags:
+      - My characters
+  /my/{name}/action/grandexchange/create-buy-order:
+    post:
+      description: |-
+        Create a buy order at the Grand Exchange on the character's map.
+
+        The total gold (price * quantity) is locked when creating the order.
+        Other players can then sell items to fulfill your order.
+        Items will be delivered to your pending items when the order is filled.
+      operationId: action_ge_create_buy_order_my__name__action_grandexchange_create_buy_order_post
+      parameters:
+      - description: Name of your character.
+        explode: false
+        in: path
+        name: name
+        required: true
+        schema:
+          description: Name of your character.
+          pattern: "^[a-zA-Z0-9_-]+$"
+          title: Character name
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GEBuyOrderCreationSchema"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GECreateOrderTransactionResponseSchema"
+          description: The buy order has been successfully created.
+        "498":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 498
+                  message: Character not found.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Character not found.
+        "499":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 499
+                  message: The character is in cooldown.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: The character is in cooldown.
+        "486":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 486
+                  message: An action is already in progress for this character.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: An action is already in progress for this character.
+        "404":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 404
+                  message: Item not found.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Item not found.
+        "492":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 492
+                  message: The character does not have enough gold.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: The character does not have enough gold.
+        "433":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 433
+                  message: You cannot create more than 100 orders at the same time.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: You cannot create more than 100 orders at the same time.
+        "437":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 437
+                  message: This item cannot be sold.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: This item cannot be sold.
+        "598":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 598
+                  message: Grand Exchange not found on this map.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Grand Exchange not found on this map.
+        "422":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 422
+                  message: Request could not be processed due to an invalid payload.
+                  data:
+                    field_name:
+                    - Field required
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Request could not be processed due to an invalid payload.
+      security:
+      - JWTBearer: []
+      summary: Action Ge Create Buy Order
+      tags:
+      - My characters
+  /my/{name}/action/grandexchange/fill:
+    post:
+      description: |-
+        Sell items to an existing buy order at the Grand Exchange on the character's map.
+
+        You will receive the gold immediately.
+        The buyer will receive the items in their pending items.
+      operationId: action_ge_fill_my__name__action_grandexchange_fill_post
+      parameters:
+      - description: Name of your character.
+        explode: false
+        in: path
+        name: name
+        required: true
+        schema:
+          description: Name of your character.
+          pattern: "^[a-zA-Z0-9_-]+$"
+          title: Character name
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GEFillBuyOrderSchema"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GETransactionResponseSchema"
+          description: Successfully sold items to the buy order.
+        "598":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 598
+                  message: Grand Exchange not found on this map.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Grand Exchange not found on this map.
+        "498":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 498
+                  message: Character not found.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Character not found.
+        "499":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 499
+                  message: The character is in cooldown.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: The character is in cooldown.
+        "436":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 436
+                  message: A transaction is already in progress for this order by
+                    another character.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: A transaction is already in progress for this order by another
+            character.
+        "486":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 486
+                  message: An action is already in progress for this character.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: An action is already in progress for this character.
+        "478":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 478
+                  message: Missing required item(s).
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Missing required item(s).
+        "434":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 434
+                  message: This offer does not contain that many items.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: This offer does not contain that many items.
+        "435":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 435
+                  message: You cannot trade with yourself.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: You cannot trade with yourself.
+        "404":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 404
+                  message: Buy order not found.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Buy order not found.
+        "422":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 422
+                  message: Request could not be processed due to an invalid payload.
+                  data:
+                    field_name:
+                    - Field required
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Request could not be processed due to an invalid payload.
+      security:
+      - JWTBearer: []
+      summary: Action Ge Fill
       tags:
       - My characters
   /my/{name}/action/task/complete:
@@ -3441,6 +3765,108 @@ paths:
       security:
       - JWTBearer: []
       summary: Action Give Items
+      tags:
+      - My characters
+  /my/{name}/action/claim_item/{id}:
+    post:
+      description: Claim a pending item with a specific character.
+      operationId: action_claim_pending_item_my__name__action_claim_item__id__post
+      parameters:
+      - description: Name of your character.
+        explode: false
+        in: path
+        name: name
+        required: true
+        schema:
+          description: Name of your character.
+          pattern: "^[a-zA-Z0-9_-]+$"
+          title: Character name
+          type: string
+        style: simple
+      - description: The ID of the pending item to claim.
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          description: The ID of the pending item to claim.
+          pattern: "^[a-zA-Z0-9]+$"
+          title: Pending item ID
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimPendingItemResponseSchema"
+          description: Successfully claimed the pending item.
+        "404":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 404
+                  message: Pending item not found.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Pending item not found.
+        "498":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 498
+                  message: Character not found.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Character not found.
+        "497":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 497
+                  message: The character's inventory is full.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: The character's inventory is full.
+        "499":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 499
+                  message: The character is in cooldown.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: The character is in cooldown.
+        "486":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 486
+                  message: An action is already in progress for this character.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: An action is already in progress for this character.
+        "422":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 422
+                  message: Request could not be processed due to an invalid payload.
+                  data:
+                    field_name:
+                    - Field required
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Request could not be processed due to an invalid payload.
+      security:
+      - JWTBearer: []
+      summary: Action Claim Pending Item
       tags:
       - My characters
   /my/{name}/action/delete:
@@ -4573,13 +4999,8 @@ paths:
       - Events
   /events/spawn:
     post:
-      description: |-
-        Spawn a specific event by code consuming 1 event token.
-
-        Rules:
-          - Maximum active events defined by utils.config.max_active_events().
-          - Event must not already be active.
-          - Member or founder account required.
+      description: Spawn a specific event by consuming 1 event token. Member or founder
+        account required.
       operationId: spawn_event_events_spawn_post
       requestBody:
         content:
@@ -4616,16 +5037,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
           description: Event not found or already active.
-        "451":
-          content:
-            application/json:
-              example:
-                error:
-                  code: 451
-                  message: "Access denied, you must be a member to do that."
-              schema:
-                $ref: "#/components/schemas/ErrorResponseSchema"
-          description: "Access denied, you must be a member to do that."
         "422":
           content:
             application/json:
@@ -4646,8 +5057,9 @@ paths:
       - Events
   /grandexchange/history/{code}:
     get:
-      description: Fetch the sales history of the item for the last 7 days.
-      operationId: get_ge_sell_history_grandexchange_history__code__get
+      description: Fetch the transaction history of the item for the last 7 days (buy
+        and sell orders).
+      operationId: get_ge_history_grandexchange_history__code__get
       parameters:
       - description: The code of the item.
         explode: false
@@ -4660,26 +5072,17 @@ paths:
           title: Item code
           type: string
         style: simple
-      - description: The seller (account name) of the item.
+      - description: Account involved in the transaction (matches either seller or
+          buyer).
         explode: true
         in: query
-        name: seller
+        name: account
         required: false
         schema:
-          description: The seller (account name) of the item.
+          description: Account involved in the transaction (matches either seller
+            or buyer).
           pattern: "^[a-zA-Z0-9_-]+$"
-          title: Seller
-          type: string
-        style: form
-      - description: The buyer (account name) of the item.
-        explode: true
-        in: query
-        name: buyer
-        required: false
-        schema:
-          description: The buyer (account name) of the item.
-          pattern: "^[a-zA-Z0-9_-]+$"
-          title: Buyer
+          title: Account
           type: string
         style: form
       - description: Page number
@@ -4724,13 +5127,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
           description: item history not found.
-      summary: Get Ge Sell History
+      summary: Get Ge History
       tags:
       - Grand Exchange
   /grandexchange/orders:
     get:
-      description: Fetch all sell orders.
-      operationId: get_ge_sell_orders_grandexchange_orders_get
+      description: |-
+        Fetch all orders (sell and buy orders).
+
+        Use the `type` parameter to filter by order type; when using `account`, `type`
+        is required to decide whether to match seller or buyer.
+      operationId: get_ge_orders_grandexchange_orders_get
       parameters:
       - description: The code of the item.
         explode: true
@@ -4743,16 +5150,27 @@ paths:
           title: Item code
           type: string
         style: form
-      - description: The seller (account name) of the item.
+      - description: The account that sells or buys items.
         explode: true
         in: query
-        name: seller
+        name: account
         required: false
         schema:
-          description: The seller (account name) of the item.
+          description: The account that sells or buys items.
           pattern: "^[a-zA-Z0-9_-]+$"
-          title: Seller
+          title: Account
           type: string
+        style: form
+      - description: Filter by order type (sell or buy).
+        explode: true
+        in: query
+        name: type
+        required: false
+        schema:
+          allOf:
+          - $ref: "#/components/schemas/GEOrderType"
+          description: Filter by order type (sell or buy).
+          title: Order type
         style: form
       - description: Page number
         explode: true
@@ -4786,13 +5204,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/DataPage_GEOrderSchema_"
           description: Successfully fetched GE orders.
-      summary: Get Ge Sell Orders
+      summary: Get Ge Orders
       tags:
       - Grand Exchange
   /grandexchange/orders/{id}:
     get:
-      description: Retrieve the sell order of a item.
-      operationId: get_ge_sell_order_grandexchange_orders__id__get
+      description: Retrieve a specific order by ID.
+      operationId: get_ge_order_grandexchange_orders__id__get
       parameters:
       - description: The id of the order.
         explode: false
@@ -4822,7 +5240,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
           description: GE order not found.
-      summary: Get Ge Sell Order
+      summary: Get Ge Order
       tags:
       - Grand Exchange
   /items:
@@ -6053,16 +6471,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
           description: Monster not found.
-        "451":
-          content:
-            application/json:
-              example:
-                error:
-                  code: 451
-                  message: "Access denied, you must be a member to do that."
-              schema:
-                $ref: "#/components/schemas/ErrorResponseSchema"
-          description: "Access denied, you must be a member to do that."
         "422":
           content:
             application/json:
@@ -6139,25 +6547,62 @@ components:
       required:
       - type
       title: AccessSchema
+    AccountAchievementObjectiveSchema:
+      description: "Schema for a single objective within an account achievement, including\
+        \ progress."
+      example:
+        total: 1
+        progress: 6
+        type: ""
+        target: target
+      properties:
+        type:
+          allOf:
+          - $ref: "#/components/schemas/AchievementType"
+          description: Type of objective.
+        target:
+          description: "Target of the objective (e.g., item code, monster code)."
+          title: Target
+          type: string
+          nullable: true
+        progress:
+          default: 0
+          description: Current progress for this objective.
+          title: Progress
+          type: integer
+        total:
+          description: Total required for this objective.
+          title: Total
+          type: integer
+      required:
+      - total
+      - type
+      title: AccountAchievementObjectiveSchema
     AccountAchievementSchema:
+      description: Full achievement data with progress - for API responses.
       example:
         completed_at: 2000-01-23T04:56:07.000+00:00
-        total: 6
-        current: 1
         code: code
         name: name
         description: description
-        type: ""
+        objectives:
+        - total: 1
+          progress: 6
+          type: ""
+          target: target
+        - total: 1
+          progress: 6
+          type: ""
+          target: target
         rewards: ""
         points: 0
-        target: target
       properties:
         name:
           description: Name of the achievement.
           title: Name
           type: string
         code:
-          description: 'Code of the achievement. '
+          description: Code of the achievement.
           title: Code
           type: string
         description:
@@ -6168,42 +6613,29 @@ components:
           description: Points of the achievement. Used for the leaderboard.
           title: Points
           type: integer
-        type:
-          allOf:
-          - $ref: "#/components/schemas/AchievementType"
-          description: Type of achievement.
-        target:
-          description: Target of the achievement.
-          title: Target
-          type: string
-          nullable: true
-        total:
-          description: Total to do.
-          title: Total
-          type: integer
+        objectives:
+          description: List of objectives with progress.
+          items:
+            $ref: "#/components/schemas/AccountAchievementObjectiveSchema"
+          title: Objectives
+          type: array
         rewards:
           allOf:
           - $ref: "#/components/schemas/AchievementRewardsSchema"
           description: Rewards.
-        current:
-          description: Current progress.
-          title: Current
-          type: integer
         completed_at:
-          description: Completed at.
+          description: Completion timestamp.
           format: date-time
           title: Completed At
           type: string
           nullable: true
       required:
       - code
-      - current
       - description
       - name
+      - objectives
       - points
       - rewards
-      - total
-      - type
       title: AccountAchievementSchema
     AccountDetails:
       example:
@@ -6334,17 +6766,45 @@ components:
       - vip_founder
       title: AccountStatus
       type: string
+    AchievementObjectiveSchema:
+      description: Schema for a single objective within an achievement.
+      example:
+        total: 6
+        type: ""
+        target: target
+      properties:
+        type:
+          allOf:
+          - $ref: "#/components/schemas/AchievementType"
+          description: Type of objective.
+        target:
+          description: "Target of the objective (e.g., item code, monster code)."
+          title: Target
+          type: string
+          nullable: true
+        total:
+          description: Total required for this objective.
+          title: Total
+          type: integer
+      required:
+      - total
+      - type
+      title: AchievementObjectiveSchema
     AchievementResponseSchema:
       example:
         data:
-          total: 6
           code: code
           name: name
           description: description
-          type: ""
+          objectives:
+          - total: 6
+            type: ""
+            target: target
+          - total: 6
+            type: ""
+            target: target
           rewards: ""
           points: 0
-          target: target
       properties:
         data:
           $ref: "#/components/schemas/AchievementSchema"
@@ -6352,31 +6812,43 @@ components:
       - data
       title: AchievementResponseSchema
     AchievementRewardsSchema:
+      description: Schema for achievement rewards including gold and items.
       properties:
         gold:
+          default: 0
           description: Gold rewards.
           title: Gold
           type: integer
-      required:
-      - gold
+        items:
+          description: Item rewards.
+          items:
+            $ref: "#/components/schemas/RewardItemSchema"
+          title: Items
+          type: array
+          nullable: true
       title: AchievementRewardsSchema
     AchievementSchema:
+      description: Schema for an achievement definition.
       example:
-        total: 6
         code: code
         name: name
         description: description
-        type: ""
+        objectives:
+        - total: 6
+          type: ""
+          target: target
+        - total: 6
+          type: ""
+          target: target
         rewards: ""
         points: 0
-        target: target
       properties:
         name:
           description: Name of the achievement.
           title: Name
           type: string
         code:
-          description: 'Code of the achievement. '
+          description: Code of the achievement.
           title: Code
           type: string
         description:
@@ -6387,19 +6859,12 @@ components:
           description: Points of the achievement. Used for the leaderboard.
           title: Points
           type: integer
-        type:
-          allOf:
-          - $ref: "#/components/schemas/AchievementType"
-          description: Type of achievement.
-        target:
-          description: Target of the achievement.
-          title: Target
-          type: string
-          nullable: true
-        total:
-          description: Total to do.
-          title: Total
-          type: integer
+        objectives:
+          description: List of objectives that must be completed.
+          items:
+            $ref: "#/components/schemas/AchievementObjectiveSchema"
+          title: Objectives
+          type: array
         rewards:
           allOf:
           - $ref: "#/components/schemas/AchievementRewardsSchema"
@@ -6408,10 +6873,9 @@ components:
       - code
       - description
       - name
+      - objectives
       - points
       - rewards
-      - total
-      - type
       title: AchievementSchema
     AchievementType:
       enum:
@@ -6424,6 +6888,8 @@ components:
       - task
       - other
       - use
+      - npc_buy
+      - npc_sell
       title: AchievementType
       type: string
     ActionType:
@@ -6435,6 +6901,8 @@ components:
       - gathering
       - buy_ge
       - sell_ge
+      - create_buy_order_ge
+      - fill_buy_order_ge
       - buy_npc
       - sell_npc
       - cancel_ge
@@ -6455,6 +6923,7 @@ components:
       - change_skin
       - rename
       - transition
+      - claim_item
       title: ActionType
       type: string
     ActiveCharacterSchema:
@@ -8318,6 +8787,7 @@ components:
       - corrupted1
       - zombie1
       - marauder1
+      - goblin1
       title: CharacterSkin
       type: string
     CharacterTransitionDataSchema:
@@ -8563,6 +9033,38 @@ components:
       required:
       - data
       title: CharactersListSchema
+    ClaimPendingItemDataSchema:
+      description: Data schema for claim pending item action.
+      properties:
+        cooldown:
+          allOf:
+          - $ref: "#/components/schemas/CooldownSchema"
+          description: Cooldown details.
+        item:
+          allOf:
+          - $ref: "#/components/schemas/PendingItemSchema"
+          description: The claimed pending item.
+        character:
+          allOf:
+          - $ref: "#/components/schemas/CharacterSchema"
+          description: Character details.
+      required:
+      - character
+      - cooldown
+      - item
+      title: ClaimPendingItemDataSchema
+    ClaimPendingItemResponseSchema:
+      description: Response schema for claim pending item action.
+      example:
+        data: ""
+      properties:
+        data:
+          allOf:
+          - $ref: "#/components/schemas/ClaimPendingItemDataSchema"
+          description: "Response data containing cooldown, item, and character."
+      required:
+      - data
+      title: ClaimPendingItemResponseSchema
     CombatResultSchema:
       properties:
         result:
@@ -8835,25 +9337,35 @@ components:
         pages: 0
         data:
         - completed_at: 2000-01-23T04:56:07.000+00:00
-          total: 6
-          current: 1
           code: code
           name: name
           description: description
-          type: ""
+          objectives:
+          - total: 1
+            progress: 6
+            type: ""
+            target: target
+          - total: 1
+            progress: 6
+            type: ""
+            target: target
           rewards: ""
           points: 0
-          target: target
         - completed_at: 2000-01-23T04:56:07.000+00:00
-          total: 6
-          current: 1
           code: code
           name: name
           description: description
-          type: ""
+          objectives:
+          - total: 1
+            progress: 6
+            type: ""
+            target: target
+          - total: 1
+            progress: 6
+            type: ""
+            target: target
           rewards: ""
           points: 0
-          target: target
         size: 1
         page: 1
       properties:
@@ -8936,22 +9448,30 @@ components:
         total: 0
         pages: 0
         data:
-        - total: 6
-          code: code
+        - code: code
           name: name
           description: description
-          type: ""
+          objectives:
+          - total: 6
+            type: ""
+            target: target
+          - total: 6
+            type: ""
+            target: target
           rewards: ""
           points: 0
-          target: target
-        - total: 6
-          code: code
+        - code: code
           name: name
           description: description
-          type: ""
+          objectives:
+          - total: 6
+            type: ""
+            target: target
+          - total: 6
+            type: ""
+            target: target
           rewards: ""
           points: 0
-          target: target
         size: 1
         page: 1
       properties:
@@ -9382,18 +9902,20 @@ components:
         total: 0
         pages: 0
         data:
-        - seller: seller
-          code: code
+        - code: code
           quantity: 8
           price: 1
           created_at: 2000-01-23T04:56:07.000+00:00
           id: id
-        - seller: seller
-          code: code
+          type: ""
+          account: account
+        - code: code
           quantity: 8
           price: 1
           created_at: 2000-01-23T04:56:07.000+00:00
           id: id
+          type: ""
+          account: account
         size: 1
         page: 1
       properties:
@@ -9851,6 +10373,68 @@ components:
       required:
       - data
       title: "DataPage[NPCSchema]"
+    DataPage_PendingItemSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - gold: 0
+          claimed_at: 2000-01-23T04:56:07.000+00:00
+          description: description
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          source: ""
+          source_id: source_id
+          items:
+          - code: code
+            quantity: 1
+          - code: code
+            quantity: 1
+          account: account
+        - gold: 0
+          claimed_at: 2000-01-23T04:56:07.000+00:00
+          description: description
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          source: ""
+          source_id: source_id
+          items:
+          - code: code
+            quantity: 1
+          - code: code
+            quantity: 1
+          account: account
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/PendingItemSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "DataPage[PendingItemSchema]"
     DataPage_ResourceSchema_:
       example:
         total: 0
@@ -10512,7 +11096,37 @@ components:
       - loss
       title: FightResult
       type: string
+    GEBuyOrderCreationSchema:
+      description: Schema for creating a buy order.
+      example:
+        code: code
+        quantity: 8
+        price: 602745618
+      properties:
+        code:
+          description: Item code.
+          pattern: "^[a-zA-Z0-9_-]+$"
+          title: Code
+          type: string
+        quantity:
+          description: Item quantity.
+          maximum: 100.0
+          minimum: 1.0
+          title: Quantity
+          type: integer
+        price:
+          description: Item price per unit.
+          maximum: 1000000000
+          minimum: 1.0
+          title: Price
+          type: integer
+      required:
+      - code
+      - price
+      - quantity
+      title: GEBuyOrderCreationSchema
     GEBuyOrderSchema:
+      description: Schema for buying from a sell order.
       example:
         quantity: 8
         id: id
@@ -10554,6 +11168,26 @@ components:
       required:
       - data
       title: GECreateOrderTransactionResponseSchema
+    GEFillBuyOrderSchema:
+      description: Schema for filling a buy order (selling items to a buy order).
+      example:
+        quantity: 8
+        id: id
+      properties:
+        id:
+          description: Buy order id.
+          title: Id
+          type: string
+        quantity:
+          description: Item quantity to sell.
+          maximum: 100.0
+          minimum: 1.0
+          title: Quantity
+          type: integer
+      required:
+      - id
+      - quantity
+      title: GEFillBuyOrderSchema
     GEOrderCreatedSchema:
       properties:
         id:
@@ -10586,21 +11220,16 @@ components:
           minimum: 1.0
           title: Total Price
           type: integer
-        tax:
-          description: "Listing tax (3%, minimum 1)"
-          minimum: 1.0
-          title: Tax
-          type: integer
       required:
       - code
       - created_at
       - id
       - price
       - quantity
-      - tax
       - total_price
       title: GEOrderCreatedSchema
     GEOrderCreationrSchema:
+      description: Schema for creating a sell order.
       example:
         code: code
         quantity: 8
@@ -10631,12 +11260,13 @@ components:
     GEOrderResponseSchema:
       example:
         data:
-          seller: seller
           code: code
           quantity: 8
           price: 1
           created_at: 2000-01-23T04:56:07.000+00:00
           id: id
+          type: ""
+          account: account
       properties:
         data:
           $ref: "#/components/schemas/GEOrderSchema"
@@ -10645,21 +11275,27 @@ components:
       title: GEOrderResponseSchema
     GEOrderSchema:
       example:
-        seller: seller
         code: code
         quantity: 8
         price: 1
         created_at: 2000-01-23T04:56:07.000+00:00
         id: id
+        type: ""
+        account: account
       properties:
         id:
           description: Order id.
           title: Id
           type: string
-        seller:
-          description: Seller account name.
-          title: Seller
+        type:
+          allOf:
+          - $ref: "#/components/schemas/GEOrderType"
+          description: Order type (sell or buy).
+        account:
+          description: Account linked to the order.
+          title: Account
           type: string
+          nullable: true
         code:
           description: Item code.
           title: Code
@@ -10686,7 +11322,6 @@ components:
       - id
       - price
       - quantity
-      - seller
       title: GEOrderSchema
     GEOrderTransactionSchema:
       example:
@@ -10711,6 +11346,13 @@ components:
       - cooldown
       - order
       title: GEOrderTransactionSchema
+    GEOrderType:
+      description: Type of Grand Exchange order.
+      enum:
+      - sell
+      - buy
+      title: GEOrderType
+      type: string
     GETransactionListSchema:
       example:
         character: ""
@@ -11252,6 +11894,8 @@ components:
       - gathering
       - buy_ge
       - sell_ge
+      - create_buy_order_ge
+      - fill_buy_order_ge
       - buy_npc
       - sell_npc
       - cancel_ge
@@ -11279,6 +11923,7 @@ components:
       - change_skin
       - rename
       - transition
+      - claim_item
       title: LogType
       type: string
     MapAccessType:
@@ -12099,6 +12744,84 @@ components:
       required:
       - message
       title: PasswordResetResponseSchema
+    PendingItemSchema:
+      description: Schema for pending items that can be claimed by any character.
+      example:
+        gold: 0
+        claimed_at: 2000-01-23T04:56:07.000+00:00
+        description: description
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: id
+        source: ""
+        source_id: source_id
+        items:
+        - code: code
+          quantity: 1
+        - code: code
+          quantity: 1
+        account: account
+      properties:
+        id:
+          description: Pending item ID.
+          title: Id
+          type: string
+        account:
+          description: Account username.
+          title: Account
+          type: string
+        source:
+          allOf:
+          - $ref: "#/components/schemas/PendingItemSource"
+          description: Source of the pending item.
+        source_id:
+          description: "ID reference for the source (e.g., achievement code, order\
+            \ id)."
+          title: Source Id
+          type: string
+          nullable: true
+        description:
+          description: Description for display.
+          title: Description
+          type: string
+        gold:
+          default: 0
+          description: Gold amount.
+          title: Gold
+          type: integer
+        items:
+          description: List of items to be claimed.
+          items:
+            $ref: "#/components/schemas/SimpleItemSchema"
+          title: Items
+          type: array
+        created_at:
+          description: When the pending item was created.
+          format: date-time
+          title: Created At
+          type: string
+        claimed_at:
+          description: When the pending item was claimed.
+          format: date-time
+          title: Claimed At
+          type: string
+          nullable: true
+      required:
+      - account
+      - created_at
+      - description
+      - id
+      - source
+      title: PendingItemSchema
+    PendingItemSource:
+      description: Source types for pending items.
+      enum:
+      - achievement
+      - grand_exchange
+      - admin
+      - event
+      - other
+      title: PendingItemSource
+      type: string
     RateLimitSchema:
       example:
         type: type
@@ -12295,6 +13018,21 @@ components:
       - cooldown
       - rewards
       title: RewardDataSchema
+    RewardItemSchema:
+      description: Schema for a single item reward.
+      properties:
+        code:
+          description: Item code.
+          title: Code
+          type: string
+        quantity:
+          description: Item quantity.
+          title: Quantity
+          type: integer
+      required:
+      - code
+      - quantity
+      title: RewardItemSchema
     RewardResponseSchema:
       example:
         data:

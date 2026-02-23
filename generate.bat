@@ -1,0 +1,1 @@
+openapi-generator-cli generate -i https://api.artifactsmmo.com/openapi.json -g csharp -o ./ArtifactsMmoClient -c openapi-config.json
