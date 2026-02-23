@@ -256,9 +256,9 @@ namespace Artifacts
             {
                 Console.WriteLine($"Already have enough items at this level, crafting without bank check");
 
-                // Remove anything that requires a task item
+                // Remove anything that requires a task item or wooden stick
                 var taskItems = await Items.Instance.GetTaskItems();
-                var newItems = items.Where(x => !x.Craft.Items.Any(c => taskItems.Any(i => i.Code == c.Code))).ToList();
+                var newItems = items.Where(x => !x.Craft.Items.Any(c => c.Code == "wooden_stick" || taskItems.Any(i => i.Code == c.Code))).ToList();
 
                 await _character.MoveTo(MapContentType.Bank);
                 await _character.DepositAllItems();

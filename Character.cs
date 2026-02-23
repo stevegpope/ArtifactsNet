@@ -786,15 +786,101 @@ namespace Artifacts
         {
             var monster = monsters.Data.MinBy(x => x.Level);
             Console.WriteLine($"Need to fight for {code}, chasing {monster}");
-            // TODO: re-enable when we have better coordination logic
+
             if (monster.Level > Utils.Details[Name].Level || monster.Type == MonsterType.Boss)
             {
-                Console.WriteLine("We can't beat this monster, bailing");
-                return 0;
+                Console.WriteLine($"We can't beat {monster.Code}, training");
+                await TrainFighting(monster.Level + 1);
             }
 
             var drops = await FightDrops(monster.Code, code, remaining);
             return drops;
+        }
+
+        private async Task TrainFighting(int level)
+        {
+            var monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1);
+            var fightList = monsters.Data.Where(x => x.Level > Utils.Details[Name].Level - 10);
+
+            while (Utils.Details[Name].Level < level)
+            {
+                var monster = fightList.ElementAt(_random.Next(fightList.Count())).Code;
+                Console.WriteLine($"Train fighting with {monster}");
+
+                await GearUpMonster(monster);
+
+                var losses = 0;
+                for (int index = 0; index < 25; index++)
+                {
+                    // If we are healthy enough fight right away
+                    var needsRest = Utils.Details[Name].Hp < Utils.Details[Name].MaxHp * .6;
+                    if (needsRest)
+                    {
+                        if (await Rest())
+                        {
+                            Console.WriteLine("We cooked food, gear up again");
+                            await GearUpMonster(monster);
+                        }
+                    }
+
+                    try
+                    {
+                        // Assume we are not at the monster
+                        await MoveTo(MapContentType.Monster, code: monster);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Cannot move to monster {monster}: {ex.Message}");
+                        break;
+                    }
+
+                    try
+                    {
+                        var hp = Utils.Details[Name].Hp;
+                        var result = await Fight();
+                        if (result.Data.Fight.Result == FightResult.Loss)
+                        {
+                            const int Limit = 3;
+                            losses++;
+                            Console.WriteLine($"loss {losses}/{Limit}");
+                            if (losses >= Limit)
+                            {
+                                Console.WriteLine($"We Lost! Giving up on training with monster {monster}");
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            // Reset losses, we can beat him!
+                            losses = 0;
+                            if (Utils.Details[Name].Level >= level)
+                            {
+                                return;
+                            }
+
+                            if (result.Data.Fight.Characters.First().Xp == 0)
+                            {
+                                Console.WriteLine($"No more XP from {monster}, getting new monsters");
+                                monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1);
+                                fightList = monsters.Data.Where(x => x.Level > Utils.Details[Name].Level - 10);
+                                break;
+                            }
+                        }
+                    }
+                    catch (ApiException ex)
+                    {
+                        if (ex.ErrorCode == 497)
+                        {
+                            Console.WriteLine("Inventory full, cannot fight");
+                            await MoveTo(MapContentType.Bank);
+                            await DepositAllItems();
+                        }
+
+                        Console.WriteLine($"Fight error: {ex.ErrorContent}");
+                        throw;
+                    }
+                }
+            }
         }
 
         private async Task<int> GatherFromBank(string code, int total)
@@ -1510,6 +1596,16 @@ namespace Artifacts
                 }
 
                 var item = Items.Instance.GetItem(bankItem.Code);
+                if (!MeetsConditions(item.Conditions))
+                {
+                    continue;
+                }
+
+                if (MatchesUtilitySlot(slotType, bankItem.Code))
+                {
+                    continue;
+                }
+
                 if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
                 {
                     if (bestItem == null)
@@ -1541,7 +1637,17 @@ namespace Artifacts
                     continue;
                 }
 
+                if (MatchesUtilitySlot(slotType, inventoryItem.Code))
+                {
+                    continue;
+                }
+
                 var item = Items.Instance.GetItem(inventoryItem.Code);
+                if (!MeetsConditions(item.Conditions))
+                {
+                    continue;
+                }
+
                 if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
                 {
                     if (bestItem == null)
@@ -1834,6 +1940,7 @@ namespace Artifacts
         {
             ItemSchema currentItem = null;
             var currentValue = 0.0;
+
             if (!string.IsNullOrEmpty(currentEquipped))
             {
                 currentItem = Items.Instance.GetItem(currentEquipped);
@@ -1925,6 +2032,37 @@ namespace Artifacts
             }
         }
 
+        private bool MeetsConditions(List<ConditionSchema> conditions)
+        {
+            if (conditions == null || conditions.Count == 0)
+            {
+                return true;
+            }
+
+            foreach (ConditionSchema condition in conditions)
+            {
+                if (condition.Code == "level")
+                {
+                    if (condition.Operator == ConditionOperator.Gt)
+                    {
+                        if (Utils.Details[Name].Level <= condition.Value)
+                        {
+                            return false;
+                        }
+                    }
+                    else if (condition.Operator == ConditionOperator.Eq)
+                    {
+                        if (Utils.Details[Name].Level != condition.Value)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
         internal ItemSchema ChoosePotion(MonsterSchema monster, ItemSlot slotType, ItemSchema weapon)
         {
             var potions = GetRecipes("alchemy").Where(x => x.Level < Utils.Details[Name].Level);
@@ -1976,8 +2114,12 @@ namespace Artifacts
                     continue;
                 }
 
-
                 var item = Items.Instance.GetItem(bankItem.Code);
+                if (!MeetsConditions(item.Conditions))
+                {
+                    continue;
+                }
+
                 if (Items.Instance.ItemTypeMatchesSlot(item.Type, slotType))
                 {
                     if (bestItem == null)
@@ -2014,6 +2156,11 @@ namespace Artifacts
                 if (item.Level > Utils.Details[Name].Level)
                 {
                     // Too high level for us
+                    continue;
+                }
+
+                if (!MeetsConditions(item.Conditions))
+                {
                     continue;
                 }
 

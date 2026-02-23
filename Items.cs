@@ -2,6 +2,7 @@
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 using static StackExchange.Redis.Role;
 
 namespace Artifacts
