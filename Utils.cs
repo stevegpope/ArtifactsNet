@@ -10,6 +10,7 @@ namespace Artifacts
         public static Dictionary<string,CharacterSchema> Details = new Dictionary<string,CharacterSchema>();
         public static BankSchema Bank { get; private set; }
         public static DateTime _nextCall = DateTime.MinValue;
+        public static double _savedMs = 0;
         public static int LastCooldown { get; private set; }
 
         internal static string ToJson<T>(
@@ -39,6 +40,10 @@ namespace Artifacts
                 return;
             }
 
+            var mod = milliseconds % 1000;
+            var diff = 1000 - mod;
+            _savedMs += diff;
+
             const int maxWidth = 25;
             int barWidth = Math.Min(maxWidth, (int)milliseconds);
 
@@ -48,7 +53,7 @@ namespace Artifacts
                 int hashes = (int)Math.Round(barWidth * progress);
 
                 string bar = new string('#', hashes).PadRight(barWidth, ' ');
-                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{milliseconds:F0}s ");
+                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{milliseconds:F0}s, saved {_savedMs}");
 
                 var wait = Math.Min(Math.Ceiling(remaining), 1000);
                 await Task.Delay((int)wait);

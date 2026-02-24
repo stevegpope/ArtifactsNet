@@ -310,9 +310,8 @@ namespace Artifacts
 
                 if (recycleQuantity > 0)
                 {
-                    // We withdraw all items so that no other characters can do it. Race condition avoidance!
                     var amount = await _character.WithdrawItems(bankItem.Code);
-                    if (amount > 0)
+                    if (amount >= recycleQuantity)
                     {
                         try
                         {
@@ -321,17 +320,7 @@ namespace Artifacts
                             // Go to relevant workshop
                             await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
 
-                            // Double check
-                            recycleQuantity = await CalculateRecycleQuantity(bankItems, characters, bankItem);
-                            if (recycleQuantity <= 0)
-                            {
-                                Console.WriteLine($"Last minute recycle changed our mind.");
-                            }
-                            else
-                            {
-                                recycleQuantity = Math.Min(recycleQuantity, amount);
-                                await _character.Recycle(item.Code, recycleQuantity);
-                            }
+                            await _character.Recycle(item.Code, recycleQuantity);
 
                             // Bank to bank for deposit
                             await _character.MoveTo(MapContentType.Bank);
