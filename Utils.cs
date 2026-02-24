@@ -9,6 +9,7 @@ namespace Artifacts
     {
         public static Dictionary<string,CharacterSchema> Details = new Dictionary<string,CharacterSchema>();
         public static BankSchema Bank { get; private set; }
+        public static DateTime _nextCall = DateTime.MinValue;
         public static int LastCooldown { get; private set; }
 
         internal static string ToJson<T>(
@@ -26,19 +27,31 @@ namespace Artifacts
 
         internal static async Task Cooldown(int totalSeconds)
         {
+            Console.WriteLine($"Cooldown seconds {totalSeconds}");
             LastCooldown = totalSeconds;
-            const int maxWidth = 25;
-            int barWidth = Math.Min(maxWidth, totalSeconds);
+            _nextCall = DateTime.UtcNow + TimeSpan.FromSeconds(totalSeconds);
+        }
 
-            for (int remaining = totalSeconds; remaining >= 0; remaining--)
+        private static async Task CooldownMillis(double milliseconds)
+        {
+            if (milliseconds <= 0)
             {
-                double progress = remaining / (double)totalSeconds;
+                return;
+            }
+
+            const int maxWidth = 25;
+            int barWidth = Math.Min(maxWidth, (int)milliseconds);
+
+            for (double remaining = milliseconds; remaining >= 0; remaining-=1000)
+            {
+                double progress = remaining / (double)milliseconds;
                 int hashes = (int)Math.Round(barWidth * progress);
 
                 string bar = new string('#', hashes).PadRight(barWidth, ' ');
-                Console.Write($"\rCooldown [{bar}] {remaining}/{totalSeconds}s ");
+                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{milliseconds:F0}s ");
 
-                await Task.Delay(1000);
+                var wait = Math.Min(Math.Ceiling(remaining), 1000);
+                await Task.Delay((int)wait);
             }
 
             Console.WriteLine();
@@ -53,6 +66,11 @@ namespace Artifacts
         {
             try
             {
+                if (_nextCall > DateTime.MinValue)
+                {
+                    await CooldownMillis((_nextCall - DateTime.UtcNow).TotalMilliseconds);
+                }
+
                 var result = await call();
                 if (TryGetProperty(result, "Data", out object data))
                 {
@@ -109,7 +127,7 @@ namespace Artifacts
             {
                 if (ex.ErrorCode == 499)
                 {
-                    Console.WriteLine($"In Cooldown");
+                    Console.WriteLine($"In Cooldown, next {_nextCall} now {DateTime.UtcNow}");
                     var content = ex.ErrorContent;
                     var seconds = GetCooldownSeconds(content.ToString());
                     if (seconds > 0)
@@ -133,6 +151,11 @@ namespace Artifacts
                 Console.WriteLine($"API call failed: {ex.ErrorContent}, code  {ex.ErrorCode}");
                 throw;
             }
+        }
+
+        private static async Task CurrentCooldown()
+        {
+            throw new NotImplementedException();
         }
 
         internal static CraftSkill GetSkillCraft(string skill)
