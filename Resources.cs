@@ -71,7 +71,7 @@ namespace Artifacts
             {
                 var result = await _api.GetAllResourcesResourcesGetAsync(drop: drop);
                 var data = result.Data;
-                if (data.Any())
+                if (data.Count != 0)
                 {
                     resource = result.Data.FirstOrDefault();
                 }

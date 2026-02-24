@@ -78,7 +78,7 @@ namespace Artifacts
             {
                 if (bankItem.Quantity > 0)
                 {
-                    var item = Items.Instance.GetItem(bankItem.Code);
+                    var item = Items.GetItem(bankItem.Code);
                     if (item.Type == "consumable" && item.Subtype == "bag")
                     {
                         var amount = await _character.WithdrawItems(item.Code, bankItem.Quantity);

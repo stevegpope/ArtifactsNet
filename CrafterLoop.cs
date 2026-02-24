@@ -27,7 +27,7 @@ namespace Artifacts
 
                 string skill = ChooseCraftingSkill();
 
-                int craftAmount = 1;
+                int craftAmount;
                 switch (skill)
                 {
                     case "weaponcrafting":
@@ -122,7 +122,7 @@ namespace Artifacts
         private async Task ProcessMonsterEvent(ActiveEventSchema activeEvent)
         {
             Console.WriteLine($"{activeEvent.Code} is present, trying to kill stuff");
-            var monster = await Monsters.Instance.GetMonster(activeEvent.Map.Interactions.Content.Code);
+            var monster = await Monsters.GetMonster(activeEvent.Map.Interactions.Content.Code);
             if (monster == null)
             {
                 Console.WriteLine($"No monsters here");
@@ -168,10 +168,8 @@ namespace Artifacts
 
         private async Task<int> CraftItems(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
         {
-            int total = 0;
-
             Console.WriteLine("Make the best gear we can");
-            total = await CraftItemsFromLevelDown(craftAmount, level, items, bankItems);
+            var total = await CraftItemsFromLevelDown(craftAmount, level, items, bankItems);
             if (total == 0)
             {
                 total = await CraftItemsFromLevelUp(craftAmount, level, items, bankItems);
@@ -227,9 +225,9 @@ namespace Artifacts
 
             var itemsList = new List<ItemSchema>(itemsAtLevel);
             var characters = await _character.GetAllCharacters();
-            while (itemsList.Any())
+            while (itemsList.Count != 0)
             {
-                var item = itemsList.ElementAt(_random.Next(itemsList.Count()));
+                var item = itemsList.ElementAt(_random.Next(itemsList.Count));
 
                 if (!ignoreBankCheck)
                 {
@@ -271,7 +269,7 @@ namespace Artifacts
             return total;
         }
 
-        private async Task<int> CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
+        private static async Task<int> CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
         {
             var total = 0;
 
@@ -318,7 +316,7 @@ namespace Artifacts
                     {
                         try
                         {
-                            var item = Items.Instance.GetItem(bankItem.Code);
+                            var item = Items.GetItem(bankItem.Code);
 
                             // Go to relevant workshop
                             await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
@@ -352,10 +350,10 @@ namespace Artifacts
             }
         }
 
-        private async Task<int> CalculateRecycleQuantity(List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, SimpleItemSchema bankItem)
+        private static async Task<int> CalculateRecycleQuantity(List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, SimpleItemSchema bankItem)
         {
             // If there are 5 of a better item in every way we can recycle all of them, if not we need to keep 5
-            var item = Items.Instance.GetItem(bankItem.Code);
+            var item = Items.GetItem(bankItem.Code);
 
             // Can it be recycled?
             if (item.Craft == null ||
@@ -384,7 +382,7 @@ namespace Artifacts
             List<ItemSchema> comparables = new List<ItemSchema>();
             foreach (var otherBankItem in bankItems)
             {
-                var comparable = Items.Instance.GetItem(otherBankItem.Code);
+                var comparable = Items.GetItem(otherBankItem.Code);
                 if (comparable.Type != item.Type)
                 {
                     continue;

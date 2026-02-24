@@ -52,7 +52,7 @@ namespace Artifacts
             return monsters;
         }
 
-        internal async Task<MonsterSchema> GetMonster(string monsterCode)
+        internal static async Task<MonsterSchema> GetMonster(string monsterCode)
         {
             if (_cache.TryGetValue(monsterCode, out var monster))
             {

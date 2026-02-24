@@ -83,17 +83,17 @@ namespace Artifacts
             return _taskItems;
         }
 
-        internal ItemSchema GetItem(string code)
+        internal static ItemSchema GetItem(string code)
         {
-            if (_cache.ContainsKey(code))
+            if (_cache.TryGetValue(code, out ItemSchema? value))
             { 
-                return _cache[code]; 
+                return value; 
             }
 
             throw new Exception($"Item with code {code} not found.");
         }
 
-        internal Dictionary<string, ItemSchema> GetAllItems()
+        internal static Dictionary<string, ItemSchema> GetAllItems()
         {
             return _cache;
         }
@@ -111,7 +111,7 @@ namespace Artifacts
             }
         }
 
-        internal bool IsBetterItem(ItemSchema bestItem, ItemSchema item, MonsterSchema monster, ItemSchema weapon, int maxLevel)
+        internal static bool IsBetterItem(ItemSchema bestItem, ItemSchema item, MonsterSchema monster, ItemSchema weapon, int maxLevel)
         {
             // Optimization
             if (bestItem != null && item != null && bestItem.Code == item.Code)
@@ -125,7 +125,7 @@ namespace Artifacts
             return item2Value > item1Value;
         }
 
-        internal double CalculateItemValue(ItemSchema item, MonsterSchema monster, ItemSchema weapon, int maxLevel)
+        internal static double CalculateItemValue(ItemSchema item, MonsterSchema monster, ItemSchema weapon, int maxLevel)
         {
             if (item.Effects == null || item.Effects.Count == 0)
             {
@@ -185,7 +185,11 @@ namespace Artifacts
             value += GetResistanceValue(item, monster, estimatedRounds);
             value += GetAttackValueForMonster(item, monster, estimatedRounds);
 
-            Console.WriteLine($"{item.Code} {value} against {monster.Code}");
+            if (value > 0)
+            {
+                Console.WriteLine($"{item.Code} {value} against {monster.Code}");
+            }
+
             return value;
         }
 
@@ -217,7 +221,7 @@ namespace Artifacts
         private static double GetPoisonValue(ItemSchema item, MonsterSchema monster, int estimatedRounds)
         {
             double value = 0;
-            if (monster.Effects != null && monster.Effects.Any())
+            if (monster.Effects != null && monster.Effects.Count != 0)
             {
                 if (monster.Effects.Any(x => x.Code == "poison"))
                 {
@@ -232,15 +236,15 @@ namespace Artifacts
         {
             double value = 0;
 
-            value += GetAttackValueWithResistance(monster.ResAir, item, monster, estimatedRounds, air);
-            value += GetAttackValueWithResistance(monster.ResEarth, item, monster, estimatedRounds, earth);
-            value += GetAttackValueWithResistance(monster.ResWater, item, monster, estimatedRounds, water);
-            value += GetAttackValueWithResistance(monster.ResFire, item, monster, estimatedRounds, fire);
+            value += GetAttackValueWithResistance(monster.ResAir, item, estimatedRounds, air);
+            value += GetAttackValueWithResistance(monster.ResEarth, item, estimatedRounds, earth);
+            value += GetAttackValueWithResistance(monster.ResWater, item, estimatedRounds, water);
+            value += GetAttackValueWithResistance(monster.ResFire, item, estimatedRounds, fire);
 
             return value;
         }
 
-        private static double GetAttackValueWithResistance(int resValue, ItemSchema item, MonsterSchema monster, int estimatedRounds, string element)
+        private static double GetAttackValueWithResistance(int resValue, ItemSchema item, int estimatedRounds, string element)
         {
             // From the docs:
             // Round(Attack * Round(Resistance * 0.01))
@@ -313,44 +317,27 @@ namespace Artifacts
             return value;
         }
 
-        internal bool ItemTypeMatchesSlot(string type, ItemSlot slotType)
+        internal static bool ItemTypeMatchesSlot(string type, ItemSlot slotType)
         {
-            switch (slotType)
+            return slotType switch
             {
-                case ItemSlot.Weapon:
-                    return "weapon" == type;
-                case ItemSlot.Boots:
-                    return "boots" == type;
-                case ItemSlot.Artifact1:
-                case ItemSlot.Artifact2:
-                case ItemSlot.Artifact3:
-                    return "artifact" == type;
-                case ItemSlot.Amulet:
-                    return "amulet" == type;
-                case ItemSlot.Bag:
-                    return "bag" == type;
-                case ItemSlot.BodyArmor:
-                    return "body_armor" == type;
-                case ItemSlot.Helmet:
-                    return "helmet" == type;
-                case ItemSlot.LegArmor:
-                    return "leg_armor" == type;
-                case ItemSlot.Ring1:
-                case ItemSlot.Ring2:
-                    return "ring" == type;
-                case ItemSlot.Rune:
-                    return "rune" == type;
-                case ItemSlot.Shield:
-                    return "shield" == type;
-                case ItemSlot.Utility1:
-                case ItemSlot.Utility2:
-                    return "utility" == type;
-                default:
-                    throw new NotImplementedException();
-            }
+                ItemSlot.Weapon => "weapon" == type,
+                ItemSlot.Boots => "boots" == type,
+                ItemSlot.Artifact1 or ItemSlot.Artifact2 or ItemSlot.Artifact3 => "artifact" == type,
+                ItemSlot.Amulet => "amulet" == type,
+                ItemSlot.Bag => "bag" == type,
+                ItemSlot.BodyArmor => "body_armor" == type,
+                ItemSlot.Helmet => "helmet" == type,
+                ItemSlot.LegArmor => "leg_armor" == type,
+                ItemSlot.Ring1 or ItemSlot.Ring2 => "ring" == type,
+                ItemSlot.Rune => "rune" == type,
+                ItemSlot.Shield => "shield" == type,
+                ItemSlot.Utility1 or ItemSlot.Utility2 => "utility" == type,
+                _ => throw new NotImplementedException(),
+            };
         }
 
-        internal bool IsBetterItemSkill(ItemSchema bestItem, ItemSchema item, string skill)
+        internal static bool IsBetterItemSkill(ItemSchema bestItem, ItemSchema item, string skill)
         {
             // Optimization
             if (bestItem != null && item != null && bestItem.Code == item.Code)
@@ -364,7 +351,7 @@ namespace Artifacts
             return item2Value > item1Value;
         }
 
-        internal double CalculateItemValueSkill(ItemSchema item, string skill)
+        internal static double CalculateItemValueSkill(ItemSchema item, string skill)
         {
             if (item == null)
             {

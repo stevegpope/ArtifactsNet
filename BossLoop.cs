@@ -36,9 +36,9 @@ namespace Artifacts
             var topGuys = characters.OrderByDescending(x => Utils.Details[x.Name].Level);
 
             const string boss = "king_slime";
-            var monster = await Monsters.Instance.GetMonster(boss);
+            var monster = await Monsters.GetMonster(boss);
 
-            var gearUp = async (Character character) =>
+            static async Task gearUp(Character character)
             {
                 await character.MoveTo(MapContentType.Bank);
                 await character.DepositAllItems();
@@ -53,7 +53,7 @@ namespace Artifacts
                 await character.GearUpMonster(boss);
                 Console.WriteLine($"{character.Name} gear up 5 complete");
                 Console.WriteLine($"{character.Name} READY FOR {boss}");
-            };
+            }
 
             var gearUpTasks = new List<Task>
             {
@@ -63,7 +63,7 @@ namespace Artifacts
             };
 
             var supportTasks = new List<Task>();
-            var potion = Items.Instance.GetItem("minor_health_potion");
+            var potion = Items.GetItem("minor_health_potion");
             foreach (var guy in topGuys.Skip(3))
             {
                 supportTasks.Add(Task.Run(async () => {
@@ -85,13 +85,13 @@ namespace Artifacts
             await FightLoop(topGuys.Take(3), boss);
         }
 
-        private ItemSchema ChooseWeapon()
+        private static ItemSchema ChooseWeapon()
         {
-            var weapons = Items.Instance.GetAllItems().Values.Where(x => x.Type == "weapon");
+            var weapons = Items.GetAllItems().Values.Where(x => x.Type == "weapon");
             return weapons.ElementAt(Random.Shared.Next(weapons.Count()));
         }
 
-        internal async Task FightLoop(IEnumerable<Character> enumerable, string boss)
+        internal static async Task FightLoop(IEnumerable<Character> enumerable, string boss)
         {
             Console.WriteLine("Boss Fight!");
 

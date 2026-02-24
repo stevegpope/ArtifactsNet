@@ -20,7 +20,7 @@ namespace Artifacts
         {
             Console.WriteLine($"Starting CraftSpecificItemLoop to make {_quantity} {_itemCode}");
 
-            var item = Items.Instance.GetItem(_itemCode);
+            var item = Items.GetItem(_itemCode);
             var crafted = await _character.CraftItems(item, _quantity);
         }
     }
