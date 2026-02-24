@@ -97,6 +97,8 @@ namespace Artifacts
 
         private async Task ProcessEvents()
         {
+            await _character.DepositPendings();
+
             var events = await Events.Instance.GetActiveEvents();
             foreach (var activeEvent in events)
             {

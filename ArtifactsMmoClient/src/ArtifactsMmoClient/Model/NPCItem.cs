@@ -99,14 +99,14 @@ namespace ArtifactsMmoClient.Model
         /// </summary>
         /// <value>Price to buy the item.</value>
         [DataMember(Name = "buy_price", EmitDefaultValue = false)]
-        public int BuyPrice { get; set; }
+        public int? BuyPrice { get; set; }
 
         /// <summary>
         /// Price to sell the item.
         /// </summary>
         /// <value>Price to sell the item.</value>
         [DataMember(Name = "sell_price", EmitDefaultValue = false)]
-        public int SellPrice { get; set; }
+        public int? SellPrice { get; set; }
 
         /// <summary>
         /// Gets or Sets additional properties

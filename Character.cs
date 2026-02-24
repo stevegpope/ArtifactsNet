@@ -662,7 +662,7 @@ namespace Artifacts
         private async Task<int> GatherFromNpc(string code, int total)
         {
             var item = await Npcs.Instance.FindNpcItem(code);
-            if (item != null && item.BuyPrice > 0)
+            if (item != null && item?.BuyPrice > 0)
             {
                 if (item.Npc == "tasks_trader") return 0;
 
@@ -693,7 +693,7 @@ namespace Artifacts
                         while (remaining > 0)
                         {
                             Console.WriteLine($"Gather {item.BuyPrice * total} {item.Currency} to buy from NPC");
-                            var gathered = await GatherItems(item.Currency, item.BuyPrice * total);
+                            var gathered = await GatherItems(item.Currency, item.BuyPrice.Value * total);
                             if (gathered > 0)
                             {
                                 remaining -= gathered;
@@ -799,15 +799,17 @@ namespace Artifacts
 
         private async Task TrainFighting(int level)
         {
-            var monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1);
-            var fightList = monsters.Data.Where(x => x.Level > Utils.Details[Name].Level - 10);
+            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 1);
+            var monsters = Monsters.Instance.GetMonsters(maxLevel);
+            var fightList = monsters.Data.OrderBy(x => x.Level).ToList();
+            var lastXp = 0;
 
             while (Utils.Details[Name].Level < level)
             {
-                var monster = fightList.ElementAt(_random.Next(fightList.Count())).Code;
-                Console.WriteLine($"Train fighting with {monster}");
+                var monster = fightList.Last();
+                Console.WriteLine($"Train fighting with {monster.Code} from level {Utils.Details[Name].Level}/{level}");
 
-                await GearUpMonster(monster);
+                await GearUpMonster(monster.Code);
 
                 var losses = 0;
                 for (int index = 0; index < 25; index++)
@@ -819,23 +821,26 @@ namespace Artifacts
                         if (await Rest())
                         {
                             Console.WriteLine("We cooked food, gear up again");
-                            await GearUpMonster(monster);
+                            await GearUpMonster(monster.Code);
                         }
                     }
 
                     try
                     {
                         // Assume we are not at the monster
-                        await MoveTo(MapContentType.Monster, code: monster);
+                        await MoveTo(MapContentType.Monster, code: monster.Code);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Cannot move to monster {monster}: {ex.Message}");
+                        Console.WriteLine($"Cannot move to monster {monster.Code}: {ex.Message}");
+                        fightList.Remove(monster);
                         break;
                     }
 
                     try
                     {
+                        Console.WriteLine($"Training run {index + 1}/25");
+
                         var hp = Utils.Details[Name].Hp;
                         var result = await Fight();
                         if (result.Data.Fight.Result == FightResult.Loss)
@@ -845,7 +850,8 @@ namespace Artifacts
                             Console.WriteLine($"loss {losses}/{Limit}");
                             if (losses >= Limit)
                             {
-                                Console.WriteLine($"We Lost! Giving up on training with monster {monster}");
+                                Console.WriteLine($"We Lost! Giving up on training with monster {monster.Code}");
+                                fightList.Remove(monster);
                                 break;
                             }
                         }
@@ -853,16 +859,22 @@ namespace Artifacts
                         {
                             // Reset losses, we can beat him!
                             losses = 0;
+
                             if (Utils.Details[Name].Level >= level)
                             {
                                 return;
                             }
 
-                            if (result.Data.Fight.Characters.First().Xp == 0)
+                            if (lastXp == 0)
                             {
-                                Console.WriteLine($"No more XP from {monster}, getting new monsters");
+                                lastXp = result.Data.Fight.Characters.First().Xp;
+                            }
+                            else if (result.Data.Fight.Characters.First().Xp < lastXp)
+                            {
+                                Console.WriteLine($"Less XP from {monster.Code}, getting new monsters");
+                                lastXp = 0;
                                 monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1);
-                                fightList = monsters.Data.Where(x => x.Level > Utils.Details[Name].Level - 10);
+                                fightList = monsters.Data.Where(x => x.Level > Utils.Details[Name].Level - 10).OrderBy(x => x.Level).ToList();
                                 break;
                             }
                         }
@@ -2346,9 +2358,43 @@ namespace Artifacts
 
         internal async Task<ClaimPendingItemDataSchema> ClaimItems(string id)
         {
+            Console.WriteLine($"Claiming pending items");
             var result = await Utils.ApiCall(async () => await _api.ActionClaimPendingItemMyNameActionClaimItemIdPostAsync(Name, id));
             var claim = result as ClaimPendingItemResponseSchema;
-            return claim.Data ;
+            return claim.Data;
+        }
+
+        internal async Task DepositPendings()
+        {
+            var pendingItems = await Bank.Instance.GetPendingItems();
+            var claimed = false;
+            foreach (var item in pendingItems)
+            {
+                if (!item.ClaimedAt.HasValue)
+                {
+                    try
+                    {
+                        var claimedStuff = await ClaimItems(item.Id);
+                        Console.WriteLine($"Claimed {claimedStuff.Item.Gold}gp");
+                        foreach (var claimedItem in claimedStuff.Item.Items)
+                        {
+                            Console.WriteLine($"{claimedItem.Quantity} {claimedItem.Code}");
+                        }
+
+                        claimed = true;
+                    }
+                    catch (ApiException ex)
+                    {
+                        Console.WriteLine($"Error claiming: {ex.ErrorContent}");
+                    }
+                }
+            }
+
+            if (claimed)
+            {
+                await MoveTo(MapContentType.Bank);
+                await DepositAllItems();
+            }
         }
     }
 }

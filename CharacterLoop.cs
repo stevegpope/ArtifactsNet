@@ -28,7 +28,6 @@ namespace Artifacts
             // Start at the bank with no inventory
             await _character.MoveTo(MapContentType.Bank);
             await _character.DepositAllItems();
-            await DepositPendings();
 
             while (true)
             {
@@ -69,32 +68,6 @@ namespace Artifacts
                 }
 
                 throw new NotImplementedException("Other roles are not implemented yet.");
-            }
-        }
-
-        private async Task DepositPendings()
-        {
-            var pendingItems = await Bank.Instance.GetPendingItems();
-            var claimed = false;
-            foreach (var item in pendingItems)
-            {
-                if (!item.ClaimedAt.HasValue)
-                {
-                    try
-                    {
-                        await _character.ClaimItems(item.Id);
-                        claimed = true;
-                    }
-                    catch (ApiException ex)
-                    {
-                        Console.WriteLine($"Error claiming: {ex.ErrorContent}");
-                    }
-                }
-            }
-
-            if (claimed)
-            {
-                await _character.DepositAllItems();
             }
         }
 
