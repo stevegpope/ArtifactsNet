@@ -91,7 +91,7 @@ namespace Artifacts
         {
             Console.WriteLine($"Moving {Name} to {locationType}, code {code}");
             var response = await Map.Instance.GetMapLayer(locationType, code);
-            if (response.Data != null && response.Data.Count == 0)
+            if (response.Data != null && response.Data.Count != 0)
             {
                 while(true)
                 {
