@@ -74,8 +74,9 @@ namespace Artifacts
                 var bankItems = await Bank.Instance.GetItems();
 
                 var result = await CraftItems(craftAmount, level, items, bankItems);
-                if (result.Recycle)
+                if (result.Recycle && result.Quantity == 1)
                 {
+                    Console.WriteLine($"Recycle immediate {result.Quantity} {result.Code}");
                     await _character.Recycle(result.Code, result.Quantity);
                 }
 
@@ -297,7 +298,7 @@ namespace Artifacts
                 return item.Craft.Items.All(c => IsMadeOfBaseResources(c.Code));
             }
 
-            return item.Type == "resource";
+            return item.Type == "resource" && item.Subtype != "task";
         }
 
         private static async Task<int> CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)

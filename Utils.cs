@@ -33,27 +33,41 @@ namespace Artifacts
             _nextCall = DateTime.UtcNow + TimeSpan.FromSeconds(totalSeconds);
         }
 
+        private static int millisToSubtract = 0;
+        private const int millisToSubtractPerCall = 25;
+        private static bool subtracting = true;
+        private static bool subtracted = false;
+
         private static async Task CooldownMillis(double milliseconds)
         {
-            if (milliseconds <= 0)
+            if (subtracting)
+            {
+                subtracted = true;
+                millisToSubtract += millisToSubtractPerCall;
+                Console.WriteLine($"Millis to subtract {millisToSubtract}");
+            }
+
+            double cooldownMillis = milliseconds - millisToSubtract;
+
+            if (cooldownMillis <= 0)
             {
                 return;
             }
 
-            var mod = milliseconds % 1000;
+            var mod = cooldownMillis % 1000;
             var diff = 1000 - mod;
             _savedMs += diff;
 
             const int maxWidth = 25;
-            int barWidth = Math.Min(maxWidth, (int)milliseconds);
+            int barWidth = Math.Min(maxWidth, (int)cooldownMillis);
 
-            for (double remaining = milliseconds; remaining >= 0; remaining-=1000)
+            for (double remaining = cooldownMillis; remaining >= 0; remaining-=1000)
             {
-                double progress = remaining / (double)milliseconds;
+                double progress = remaining / (double)cooldownMillis;
                 int hashes = (int)Math.Round(barWidth * progress);
 
                 string bar = new string('#', hashes).PadRight(barWidth, ' ');
-                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{milliseconds:F0}s, saved {_savedMs}");
+                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{cooldownMillis:F0}s, saved {_savedMs}");
 
                 var wait = Math.Min(Math.Ceiling(remaining), 1000);
                 await Task.Delay((int)wait);
@@ -132,6 +146,14 @@ namespace Artifacts
             {
                 if (ex.ErrorCode == 499)
                 {
+                    // Go back one
+                    if (subtracting && subtracted)
+                    {
+                        subtracting = false;
+                        millisToSubtract -= millisToSubtractPerCall;
+                        Console.WriteLine($"Cooldown hit, reducing millisToSubtract to {millisToSubtract}");
+                    }
+
                     Console.WriteLine($"In Cooldown, next {_nextCall} now {DateTime.UtcNow}");
                     var content = ex.ErrorContent;
                     var seconds = GetCooldownSeconds(content.ToString());
