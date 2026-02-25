@@ -1244,12 +1244,19 @@ namespace Artifacts
 
             await MoveTo(MapContentType.Bank);
 
-            await Utils.ApiCall(async () =>
+            try
             {
-                Console.WriteLine($"Depositing {Utils.Details[Name].Gold} gold for character {Name}");
-                var response = await _api.ActionDepositBankGoldMyNameActionBankDepositGoldPostAsync(Name, new DepositWithdrawGoldSchema(quantity: Utils.Details[Name].Gold));
-                return response;
-            });
+                await Utils.ApiCall(async () =>
+                {
+                    Console.WriteLine($"Depositing {Utils.Details[Name].Gold} gold for character {Name}");
+                    var response = await _api.ActionDepositBankGoldMyNameActionBankDepositGoldPostAsync(Name, new DepositWithdrawGoldSchema(quantity: Utils.Details[Name].Gold));
+                    return response;
+                });
+            }
+            catch (ApiException ex)
+            {
+                Console.WriteLine($"Error trying to deposit gold {ex.ErrorContent}");
+            }
         }
 
         internal async Task<int> WithdrawGold(int quantity)

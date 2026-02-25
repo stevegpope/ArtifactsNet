@@ -112,9 +112,8 @@ namespace Artifacts
                 }
                 else if (ex.ErrorCode == 502)
                 { 
-                    Console.WriteLine($"{ex.ErrorContent}, trying again");
-                    await Task.Delay(5000); 
-                    return await ApiCall(call);
+                    Console.WriteLine($"{ex.ErrorContent}, usually this worked");
+                    return null;
                 }
 
                 Console.WriteLine($"API call failed: {ex.ErrorContent}, code  {ex.ErrorCode}");
