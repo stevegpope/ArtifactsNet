@@ -146,11 +146,11 @@ namespace Artifacts
             {
                 if (ex.ErrorCode == 499)
                 {
-                    // Go back one
+                    // Go back a little
                     if (subtracting && subtracted)
                     {
                         subtracting = false;
-                        millisToSubtract -= millisToSubtractPerCall;
+                        millisToSubtract -= 5;
                         Console.WriteLine($"Cooldown hit, reducing millisToSubtract to {millisToSubtract}");
                     }
 
