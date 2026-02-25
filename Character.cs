@@ -1176,6 +1176,7 @@ namespace Artifacts
                 else if (ex.ErrorCode == 478)
                 {
                     Console.WriteLine("Do not have items, must have worked already");
+                    return;
                 }
 
                 throw;

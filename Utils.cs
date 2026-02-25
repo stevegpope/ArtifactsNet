@@ -9,9 +9,15 @@ namespace Artifacts
     {
         public static Dictionary<string,CharacterSchema> Details = new Dictionary<string,CharacterSchema>();
         public static BankSchema Bank { get; private set; }
-        public static DateTime _nextCall = DateTime.MinValue;
-        public static double _savedMs = 0;
-        public static double LastCooldown { get; private set; }
+        public static double LastCooldown
+        {
+            get
+            {
+                return _cooldownManager.LastCooldown;
+            }
+        }
+
+        private static readonly CooldownManager _cooldownManager = new CooldownManager();
 
         internal static string ToJson<T>(
             this T obj
@@ -26,59 +32,6 @@ namespace Artifacts
                 });
         }
 
-        internal static async Task Cooldown(double totalSeconds)
-        {
-            Console.WriteLine($"Cooldown seconds {totalSeconds}");
-            LastCooldown = totalSeconds;
-            _nextCall = DateTime.UtcNow + TimeSpan.FromSeconds(totalSeconds);
-        }
-
-        // Testing shows that this is about right for my machine and network
-        private static int millisToSubtract = 300;
-        private const int millisToSubtractPerCall = 25;
-        private static bool subtracting = true;
-        private static bool subtracted = false;
-        private static DateTime lastSubtract = DateTime.MinValue;
-
-        private static async Task CooldownMillis(double milliseconds)
-        {
-            if (subtracting || DateTime.UtcNow > lastSubtract + TimeSpan.FromMinutes(5))
-            {
-                lastSubtract = DateTime.UtcNow;
-                subtracted = true;
-                millisToSubtract += millisToSubtractPerCall;
-                Console.WriteLine($"Millis to subtract {millisToSubtract}");
-            }
-
-            double cooldownMillis = milliseconds - millisToSubtract;
-
-            if (cooldownMillis <= 0)
-            {
-                return;
-            }
-
-            var mod = cooldownMillis % 1000;
-            var diff = 1000 - mod;
-            _savedMs += diff;
-
-            const int maxWidth = 25;
-            int barWidth = Math.Min(maxWidth, (int)cooldownMillis);
-
-            for (double remaining = cooldownMillis; remaining >= 0; remaining-=1000)
-            {
-                double progress = remaining / (double)cooldownMillis;
-                int hashes = (int)Math.Round(barWidth * progress);
-
-                string bar = new string('#', hashes).PadRight(barWidth, ' ');
-                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{cooldownMillis:F0}s, saved {_savedMs}");
-
-                var wait = Math.Min(Math.Ceiling(remaining), 1000);
-                await Task.Delay((int)wait);
-            }
-
-            Console.WriteLine();
-        }
-
         internal static double CalculateManhattanDistance(double x1, double y1, double x2, double y2)
         {
             return Math.Abs(x1 - x2) + Math.Abs(y1 - y2);
@@ -88,23 +41,21 @@ namespace Artifacts
         {
             try
             {
-                if (_nextCall > DateTime.MinValue)
-                {
-                    await CooldownMillis((_nextCall - DateTime.UtcNow).TotalMilliseconds);
-                }
+                await _cooldownManager.WaitForNextCall();
 
                 var result = await call();
+
                 if (TryGetProperty(result, "Data", out object data))
                 {
                     if (TryGetProperty(result?.Data, "Cooldown", out object cooldown))
                     {
                         if (cooldown is CooldownSchema cooldownSchema)
                         {
-                            await Cooldown(cooldownSchema.TotalSeconds);
+                            await _cooldownManager.Cooldown(cooldownSchema.TotalSeconds);
                         }
                         else if (cooldown is int cooldownValue)
                         {
-                            await Cooldown(cooldownValue);
+                            await _cooldownManager.Cooldown(cooldownValue);
                         }
                         else
                         {
@@ -149,22 +100,9 @@ namespace Artifacts
             {
                 if (ex.ErrorCode == 499)
                 {
-                    // Go back a little
-                    if (subtracted)
-                    {
-                        subtracting = false;
-                        millisToSubtract -= millisToSubtractPerCall;
-                        millisToSubtract = Math.Max(0, millisToSubtract);
-                        Console.WriteLine($"millisToSubtract: {millisToSubtract}");
-                    }
+                    // Too fast, back off
+                    await _cooldownManager.BackOff(ex.ErrorContent.ToString());
 
-                    Console.WriteLine($"In Cooldown, next {_nextCall} now {DateTime.UtcNow}");
-                    var content = ex.ErrorContent;
-                    var seconds = GetCooldownSeconds(content.ToString());
-                    if (seconds > 0)
-                    {
-                        await Cooldown(seconds);
-                    }
                     return await ApiCall(call);
                 }
                 else if (ex.ErrorCode == 486)
@@ -182,11 +120,6 @@ namespace Artifacts
                 Console.WriteLine($"API call failed: {ex.ErrorContent}, code  {ex.ErrorCode}");
                 throw;
             }
-        }
-
-        private static async Task CurrentCooldown()
-        {
-            throw new NotImplementedException();
         }
 
         internal static CraftSkill GetSkillCraft(string skill)
@@ -222,17 +155,6 @@ namespace Artifacts
 
             value = prop.GetValue(obj);
             return value != null;
-        }
-
-        private static double GetCooldownSeconds(string input)
-        {
-            var match = Regex.Match(input, @"([\d.]+)\s*seconds");
-
-            var result = match.Success
-                ? double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)
-                : 0;
-
-            return result;
         }
     }
 }
