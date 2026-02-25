@@ -11,7 +11,7 @@ namespace Artifacts
         public static BankSchema Bank { get; private set; }
         public static DateTime _nextCall = DateTime.MinValue;
         public static double _savedMs = 0;
-        public static int LastCooldown { get; private set; }
+        public static double LastCooldown { get; private set; }
 
         internal static string ToJson<T>(
             this T obj
@@ -26,22 +26,25 @@ namespace Artifacts
                 });
         }
 
-        internal static async Task Cooldown(int totalSeconds)
+        internal static async Task Cooldown(double totalSeconds)
         {
             Console.WriteLine($"Cooldown seconds {totalSeconds}");
             LastCooldown = totalSeconds;
             _nextCall = DateTime.UtcNow + TimeSpan.FromSeconds(totalSeconds);
         }
 
-        private static int millisToSubtract = 0;
+        // Testing shows that this is about right for my machine and network
+        private static int millisToSubtract = 300;
         private const int millisToSubtractPerCall = 25;
         private static bool subtracting = true;
         private static bool subtracted = false;
+        private static DateTime lastSubtract = DateTime.MinValue;
 
         private static async Task CooldownMillis(double milliseconds)
         {
-            if (subtracting)
+            if (subtracting || DateTime.UtcNow > lastSubtract + TimeSpan.FromMinutes(5))
             {
+                lastSubtract = DateTime.UtcNow;
                 subtracted = true;
                 millisToSubtract += millisToSubtractPerCall;
                 Console.WriteLine($"Millis to subtract {millisToSubtract}");
@@ -147,11 +150,12 @@ namespace Artifacts
                 if (ex.ErrorCode == 499)
                 {
                     // Go back a little
-                    if (subtracting && subtracted)
+                    if (subtracted)
                     {
                         subtracting = false;
-                        millisToSubtract -= 5;
-                        Console.WriteLine($"Cooldown hit, reducing millisToSubtract to {millisToSubtract}");
+                        millisToSubtract -= millisToSubtractPerCall;
+                        millisToSubtract = Math.Max(0, millisToSubtract);
+                        Console.WriteLine($"millisToSubtract: {millisToSubtract}");
                     }
 
                     Console.WriteLine($"In Cooldown, next {_nextCall} now {DateTime.UtcNow}");
@@ -220,7 +224,7 @@ namespace Artifacts
             return value != null;
         }
 
-        private static int GetCooldownSeconds(string input)
+        private static double GetCooldownSeconds(string input)
         {
             var match = Regex.Match(input, @"([\d.]+)\s*seconds");
 
@@ -228,7 +232,7 @@ namespace Artifacts
                 ? double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)
                 : 0;
 
-            return (int)Math.Ceiling(result);
+            return result;
         }
     }
 }

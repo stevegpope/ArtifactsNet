@@ -742,7 +742,7 @@ namespace Artifacts
             var leftToGet = remaining - gathered;
             while (leftToGet > 0)
             {
-                var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: leftToGet * Utils.LastCooldown);
+                var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: (int)(leftToGet * Utils.LastCooldown));
                 Console.WriteLine($"{gathered}/{remaining} {code} ETA: {estimatedTime}");
 
                 try
@@ -1133,7 +1133,6 @@ namespace Artifacts
         internal async Task DepositAllItems()
         {
             Console.WriteLine($"Depositing all items for character {Name}");
-            await DepositGold();
             await DepositExcept(new List<string>());
         }
 
