@@ -11,6 +11,27 @@ namespace Artifacts
         private Random _random = Random.Shared;
         private string Name { get; set; }
 
+        internal class CraftResult
+        {
+            internal CraftResult()
+            {
+                Code = null;
+                Recycle = false;
+                Quantity = 0;
+            }
+
+            internal CraftResult(string code, int quantity, bool recycle)
+            {
+                Code = code;
+                Recycle = recycle;
+                Quantity = quantity;
+            }
+
+            public string Code { get; set; }
+            public bool Recycle { get; set; }
+            public int Quantity { get; set; }
+        }
+
         public CrafterLoop(Character character)
         {
             _character = character;
@@ -48,15 +69,18 @@ namespace Artifacts
                 Console.WriteLine($"Crafter chose skill {skill} at level {level} with {craftSkill}");
 
                 var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
-                Console.WriteLine($"{items.Data.Count} potential things to craft");
+                Console.WriteLine($"{items.Count} potential things to craft");
 
                 var bankItems = await Bank.Instance.GetItems();
 
-                int total = await CraftItems(craftAmount, level, items, bankItems);
+                var result = await CraftItems(craftAmount, level, items, bankItems);
+                if (result.Recycle)
+                {
+                    await _character.Recycle(result.Code, result.Quantity);
+                }
 
-                // This is for alchemy.
                 // Nobody can craft anything until alchemy 5
-                if (total == 0)
+                if (result.Quantity == 0)
                 {
                     await _character.TrainGathering(5, skill);
                 }
@@ -155,7 +179,7 @@ namespace Artifacts
                 if (bankItem != null)
                 {
                     await _character.MoveTo(MapContentType.Bank);
-                    var withdrawn = await _character.WithdrawItems(bankItem.Code);
+                    var withdrawn = await _character.WithdrawItems(bankItem.Code, 100);
                     if (withdrawn > 0)
                     {
                         Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
@@ -166,61 +190,58 @@ namespace Artifacts
             }
         }
 
-        private async Task<int> CraftItems(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
+        private async Task<CraftResult> CraftItems(int craftAmount, int level, List<ItemSchema> items, List<SimpleItemSchema> bankItems)
         {
             Console.WriteLine("Make the best gear we can");
-            var total = await CraftItemsFromLevelDown(craftAmount, level, items, bankItems);
-            if (total == 0)
+            var result = await CraftItemsFromLevelDown(craftAmount, level, items, bankItems);
+            if (result.Quantity == 0)
             {
-                total = await CraftItemsFromLevelUp(craftAmount, level, items, bankItems);
+                result = await CraftItemsFromLevelUp(craftAmount, level, items, bankItems);
             }
 
-            return total;
+            return result;
         }
 
-        private async Task<int> CraftItemsFromLevelUp(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
+        private async Task<CraftResult> CraftItemsFromLevelUp(int craftAmount, int level, List<ItemSchema> items, List<SimpleItemSchema> bankItems)
         {
             var minLevel = Math.Max(level - 10, 1);
             Console.WriteLine($"Crafting {craftAmount} items from {minLevel} up");
 
-            int total = 0;
             for (int targetLevel = minLevel; targetLevel < level; targetLevel++)
             {
-                total = await CraftItemsAtLevel(targetLevel, craftAmount, items.Data, bankItems, ignoreBankCheck: true);
-                if (total > 0)
+                var result = await CraftItemsAtLevel(targetLevel, craftAmount, items, bankItems, ignoreBankCheck: true);
+                if (result.Quantity > 0)
                 {
                     break;
                 }
             }
 
-            return total;
+            return new CraftResult();
         }
 
-        private async Task<int> CraftItemsFromLevelDown(int craftAmount, int level, DataPageItemSchema items, List<SimpleItemSchema> bankItems)
+        private async Task<CraftResult> CraftItemsFromLevelDown(int craftAmount, int level, List<ItemSchema> items, List<SimpleItemSchema> bankItems)
         {
             Console.WriteLine($"Crafting {craftAmount} items from {level} down");
 
-            int total = 0;
             for (int targetLevel = level; targetLevel > 0; targetLevel--)
             {
-                total = await CraftItemsAtLevel(targetLevel, craftAmount, items.Data, bankItems);
-                if (total > 0)
+                var result = await CraftItemsAtLevel(targetLevel, craftAmount, items, bankItems);
+                if (result.Quantity > 0)
                 {
-                    break;
+                    return result;
                 }
             }
 
-            return total;
+            return new CraftResult();
         }
 
-        private async Task<int> CraftItemsAtLevel(int targetLevel, int craftAmount, List<ItemSchema> items, List<SimpleItemSchema> bankItems, bool ignoreBankCheck = false)
+        private async Task<CraftResult> CraftItemsAtLevel(int targetLevel, int craftAmount, List<ItemSchema> items, List<SimpleItemSchema> bankItems, bool ignoreBankCheck = false)
         {
-            var total = 0;
             var itemsAtLevel = items.Where(x => x.Level == targetLevel);
             Console.WriteLine($"{itemsAtLevel.Count()} potential things to craft at level {targetLevel}");
             if (!itemsAtLevel.Any())
             {
-                return 0;
+                return new CraftResult();
             }
 
             var itemsList = new List<ItemSchema>(itemsAtLevel);
@@ -243,30 +264,40 @@ namespace Artifacts
                     Console.WriteLine($"We will craft {item.Code}, current inventory {currentAmount}");
                 }
 
-                total = await _character.CraftItems(item, craftAmount);
+                var total = await _character.CraftItems(item, craftAmount);
                 if (total == 0)
                 {
                     itemsList.Remove(item);
                     continue;
                 }
-                break;
+                else
+                {
+                    return new CraftResult(item.Code, total, false);
+                }
             }
 
-            if (total == 0)
-            {
-                Console.WriteLine($"Already have enough items at this level, crafting without bank check");
+            Console.WriteLine($"Already have enough items at this level, crafting without bank check");
 
-                // Remove anything that requires a task item or wooden stick
-                var taskItems = await Items.Instance.GetTaskItems();
-                var newItems = items.Where(x => !x.Craft.Items.Any(c => c.Code == "wooden_stick" || taskItems.Any(i => i.Code == c.Code))).ToList();
+            // Remove anything that isn't made of resources
+            var newItems = items.Where(x => IsMadeOfBaseResources(x.Code)).ToList();
 
-                await _character.MoveTo(MapContentType.Bank);
-                await _character.DepositAllItems();
+            await _character.MoveTo(MapContentType.Bank);
+            await _character.DepositAllItems();
                     
-                return await CraftItemsAtLevel(targetLevel, craftAmount, newItems, bankItems, ignoreBankCheck: true);
+            var result = await CraftItemsAtLevel(targetLevel, craftAmount, newItems, bankItems, ignoreBankCheck: true);
+            return new CraftResult(result.Code, result.Quantity, true);
+        }
+
+        private bool IsMadeOfBaseResources(string code)
+        {
+            var item = Items.GetItem(code);
+
+            if (item.Craft != null)
+            {
+                return item.Craft.Items.All(c => IsMadeOfBaseResources(c.Code));
             }
 
-            return total;
+            return item.Type == "resource";
         }
 
         private static async Task<int> CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)

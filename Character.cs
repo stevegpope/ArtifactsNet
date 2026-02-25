@@ -12,6 +12,7 @@ namespace Artifacts
         internal MyCharactersApi _api;
         private static readonly Random _random = Random.Shared;
         internal string Name { get; }
+        private DateTime LastDeposit = DateTime.MinValue;
 
         internal Character(
             Configuration config,
@@ -513,13 +514,20 @@ namespace Artifacts
                 withdrawn = await GatherFromBank(code, total);
                 if (withdrawn < total)
                 {
-                    Console.WriteLine($"Did not get enough from the bank, still need {total - withdrawn}");
+                    Console.WriteLine($"Did not get enough from the bank, still need {total - withdrawn} {code}");
                 }
                 else
                 {
                     Console.WriteLine($"Got enough from the bank");
                     return withdrawn;
                 }
+            }
+
+            if (code == "gold")
+            {
+                // No other way to get gold
+                Console.WriteLine($"Only got {withdrawn} gold");
+                return withdrawn;
             }
 
             if (bankOnly)
@@ -538,6 +546,12 @@ namespace Artifacts
                 return crafted + withdrawn;
             }
 
+            int amountFromNpcs = await GatherFromNpc(code, remaining);
+            if (amountFromNpcs > 0)
+            {
+                return amountFromNpcs + withdrawn;
+            }
+
             var resource = await Resources.Instance.GetResourceDrop(code);
             if (resource != null)
             {
@@ -550,12 +564,6 @@ namespace Artifacts
             {
                 var foughtFor = await GatherFromMonsters(code, remaining, monsters);
                 return foughtFor + withdrawn;
-            }
-
-            int amountFromNpcs = await GatherFromNpc(code, remaining);
-            if (amountFromNpcs > 0)
-            {
-                return amountFromNpcs + withdrawn;
             }
 
             int amountFromMarket = await GatherFromMarket(code, remaining);
@@ -675,19 +683,6 @@ namespace Artifacts
 
                     if (map.Layer == MapLayer.Overworld)
                     {
-                        try
-                        {
-                            // Double check that we can move to him
-                            Console.WriteLine($"Try to move to NPC {item.Npc}");
-                            await Move(map.X, map.Y);
-                        }
-                        catch (Exception ex)
-                        {
-                            // We cannot move to the npc!
-                            Console.WriteLine($"Cannot move to {item.Npc}: {ex.Message}");
-                            continue;
-                        }
-
                         var remaining = item.BuyPrice * total;
 
                         while (remaining > 0)
@@ -705,8 +700,18 @@ namespace Artifacts
                             }
                         }
 
-                        Console.WriteLine($"Move to NPC {item.Npc}");
-                        await Move(map.X, map.Y);
+                        try
+                        {
+                            Console.WriteLine($"Move to NPC {item.Npc}");
+                            await Move(map.X, map.Y);
+                        }
+                        catch (Exception ex)
+                        {
+                            // We cannot move to the npc!
+                            Console.WriteLine($"Cannot move to {item.Npc}: {ex.Message}");
+                            continue;
+                        }
+
                         await BuyNpcItem(code, total);
                         return total;
                     }
@@ -897,6 +902,16 @@ namespace Artifacts
 
         private async Task<int> GatherFromBank(string code, int total)
         {
+            if (code == "gold")
+            {
+                var details = await Bank.Instance.GetBankDetails();
+                var gold = details.Gold;
+                var quantity = Math.Min(total, gold);
+                Console.WriteLine($"Withdraw {quantity} gold");
+                await MoveTo(MapContentType.Bank);
+                return await WithdrawGold(quantity);
+            }
+
             var bankItems = await Bank.Instance.GetItems();
             var bankItemAmount = bankItems.Where(x => x.Code == code).Sum(x => x.Quantity);
             if (bankItemAmount > 0)
@@ -1159,6 +1174,10 @@ namespace Artifacts
                     await DepositItems(items);
                     return;
                 }
+                else if (ex.ErrorCode == 478)
+                {
+                    Console.WriteLine("Do not have items, must have worked already");
+                }
 
                 throw;
             }
@@ -1169,16 +1188,13 @@ namespace Artifacts
             var bankDetails = await Bank.Instance.GetBankDetails();
             var withdrawn = await WithdrawGold(bankDetails.NextExpansionCost);
 
-            while (withdrawn == bankDetails.NextExpansionCost)
+            if (withdrawn == bankDetails.NextExpansionCost)
             {
                 Console.WriteLine($"{Name} buying bank expansion for {bankDetails.NextExpansionCost}");
                 await Utils.ApiCall(async () =>
                 {
                     return await _api.ActionBuyBankExpansionMyNameActionBankBuyExpansionPostAsync(Name);
                 });
-
-                bankDetails = await Bank.Instance.GetBankDetails();
-                withdrawn = await WithdrawGold(bankDetails.NextExpansionCost);
             }
         }
 
@@ -1209,10 +1225,22 @@ namespace Artifacts
 
         internal async Task DepositGold()
         {
+            if (LastDeposit != DateTime.MinValue)
+            {
+                const int hours = 1;
+                if (DateTime.UtcNow < LastDeposit + TimeSpan.FromHours(hours))
+                {
+                    Console.WriteLine($"Skip deposit gold until {LastDeposit + TimeSpan.FromHours(hours)}");
+                    return;
+                }
+            }
+
             if (Utils.Details[Name].Gold <= 0)
             {
                 return;
             }
+
+            LastDeposit = DateTime.UtcNow;
 
             await MoveTo(MapContentType.Bank);
 

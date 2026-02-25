@@ -98,12 +98,12 @@ namespace Artifacts
             return _cache;
         }
 
-        internal async Task<DataPageItemSchema> GetItems(CraftSkill skill, int minLevel, int maxLevel)
+        internal async Task<List<ItemSchema>> GetItems(CraftSkill skill, int minLevel, int maxLevel)
         {
             var items = await _api.GetAllItemsItemsGetAsync(minLevel: minLevel, maxLevel: maxLevel, craftSkill: skill);
             if (items != null)
             {
-                return items;
+                return items.Data;
             }
             else
             {
