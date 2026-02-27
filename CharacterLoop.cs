@@ -25,14 +25,8 @@ namespace Artifacts
                 Console.WriteLine($"Arguments {string.Join(',', _arguments)}");
             }
 
-            // Start at the bank with no inventory
-            await _character.MoveTo(MapContentType.Bank);
-            await _character.DepositAllItems();
-
             while (true)
             {
-                await CheckForGold();
-
                 if (_role == "fighter")
                 {
                     var loop = new FighterLoop(_character);
@@ -68,27 +62,6 @@ namespace Artifacts
                 }
 
                 throw new NotImplementedException("Other roles are not implemented yet.");
-            }
-        }
-
-        private async Task CheckForGold()
-        {
-            var bankItems = await Bank.Instance.GetItems();
-            foreach (var bankItem in bankItems)
-            {
-                if (bankItem.Quantity > 0)
-                {
-                    var item = Items.GetItem(bankItem.Code);
-                    if (item.Type == "consumable" && item.Subtype == "bag")
-                    {
-                        var amount = await _character.WithdrawItems(item.Code, bankItem.Quantity);
-                        if (amount > 0)
-                        {
-                            Console.WriteLine("GOLD SWEET GOLD!!");
-                            await _character.Consume(item.Code, amount);
-                        }
-                    }
-                }
             }
         }
     }

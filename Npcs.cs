@@ -41,7 +41,7 @@ namespace Artifacts
 
         internal async Task<NPCItem> FindNpcItem(string code)
         {
-            var page = await Utils.ApiCall(async () =>
+            var page = await Utils.ApiCallGet(async () =>
             {
                 return await _api.GetAllNpcsItemsNpcsItemsGetAsync(code);
             }) as DataPageNPCItem;
@@ -56,7 +56,7 @@ namespace Artifacts
 
         internal async Task<List<NPCItem>> GetNpcItems(string code)
         {
-            var items = await Utils.ApiCall(async () =>
+            var items = await Utils.ApiCallGet(async () =>
             {
                 return await _api.GetNpcItemsNpcsItemsCodeGetAsync(code);
             });

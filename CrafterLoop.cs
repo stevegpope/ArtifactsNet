@@ -10,6 +10,7 @@ namespace Artifacts
         private Character _character;
         private Random _random = Random.Shared;
         private string Name { get; set; }
+        private CurrentCraftManager _craftManager;
 
         internal class CraftResult
         {
@@ -36,14 +37,38 @@ namespace Artifacts
         {
             _character = character;
             Name = _character.Name;
+            _craftManager = new CurrentCraftManager(Name);
         }
 
         internal async Task RunAsync()
         {
             Console.WriteLine($"Starting crafter loop");
 
+            var currentCraft = _craftManager.GetCurrentCraft();
+            if (currentCraft != null)
+            {
+                try
+                {
+                    Console.WriteLine("Continue crafting " + currentCraft.Code);
+                    await _character.CraftItems(Items.GetItem(currentCraft.Code), currentCraft.Quantity);
+                }
+                finally
+                {
+                    _craftManager.FinishCraft();
+                }
+            }
+            else
+            {
+                Console.WriteLine("No current craft, starting fresh");
+            }
+
+            // Start at the bank with no inventory
+            await _character.MoveTo(MapContentType.Bank);
+            await _character.DepositAllItems();
+
             while (true)
             {
+                await CheckForGold();
                 await ProcessEvents();
 
                 string skill = ChooseCraftingSkill();
@@ -92,6 +117,26 @@ namespace Artifacts
 
                 // Recycle leftovers
                 await Recycle();
+            }
+        }
+        private async Task CheckForGold()
+        {
+            var bankItems = await Bank.Instance.GetItems();
+            foreach (var bankItem in bankItems)
+            {
+                if (bankItem.Quantity > 0)
+                {
+                    var item = Items.GetItem(bankItem.Code);
+                    if (item.Type == "consumable" && item.Subtype == "bag")
+                    {
+                        var amount = await _character.WithdrawItems(item.Code, bankItem.Quantity);
+                        if (amount > 0)
+                        {
+                            Console.WriteLine("GOLD SWEET GOLD!!");
+                            await _character.Consume(item.Code, amount);
+                        }
+                    }
+                }
             }
         }
 
@@ -265,15 +310,24 @@ namespace Artifacts
                     Console.WriteLine($"We will craft {item.Code}, current inventory {currentAmount}");
                 }
 
-                var total = await _character.CraftItems(item, craftAmount);
-                if (total == 0)
+                _craftManager.StartCraft(item.Code, craftAmount);
+
+                try
                 {
-                    itemsList.Remove(item);
-                    continue;
+                    var total = await _character.CraftItems(item, craftAmount);
+                    if (total == 0)
+                    {
+                        itemsList.Remove(item);
+                        continue;
+                    }
+                    else
+                    {
+                        return new CraftResult(item.Code, total, false);
+                    }
                 }
-                else
+                finally
                 {
-                    return new CraftResult(item.Code, total, false);
+                    _craftManager.FinishCraft();
                 }
             }
 

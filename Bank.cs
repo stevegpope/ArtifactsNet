@@ -43,7 +43,7 @@ namespace Artifacts
 
         internal async Task<List<GEOrderSchema>> GetExchangeOrders(string code)
         {
-            var orders = await Utils.ApiCall(async () =>
+            var orders = await Utils.ApiCallGet(async () =>
             {
                 return await _exchangeApi.GetGeOrdersGrandexchangeOrdersGetAsync(code);
             }) as DataPageGEOrderSchema;
@@ -59,7 +59,7 @@ namespace Artifacts
 
             do
             {
-                var data = await Utils.ApiCall(async () =>
+                var data = await Utils.ApiCallGet(async () =>
                 {
                     return await _api.GetBankItemsMyBankItemsGetAsync(page: pageNum);
                 });
@@ -75,13 +75,13 @@ namespace Artifacts
 
         internal async Task<BankSchema> GetBankDetails()
         {
-            var result = await Utils.ApiCall(async () => await _api.GetBankDetailsMyBankGetAsync());
+            var result = await Utils.ApiCallGet(async () => await _api.GetBankDetailsMyBankGetAsync());
             return (result as BankResponseSchema).Data;
         }
 
         internal async Task<List<PendingItemSchema>> GetPendingItems()
         {
-            var result = await Utils.ApiCall(async () => await _api.GetPendingItemsMyPendingItemsGetAsync()) as DataPagePendingItemSchema;
+            var result = await Utils.ApiCallGet(async () => await _api.GetPendingItemsMyPendingItemsGetAsync()) as DataPagePendingItemSchema;
             return result.Data;
         }
     }

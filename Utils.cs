@@ -37,6 +37,19 @@ namespace Artifacts
             return Math.Abs(x1 - x2) + Math.Abs(y1 - y2);
         }
 
+        internal static async Task<object> ApiCallGet(Func<Task<dynamic>> call)
+        {
+            object result = null;
+
+            do
+            { 
+                result = await ApiCall(call);
+            }
+            while (result == null);
+
+            return result;
+        }
+
         internal static async Task<object> ApiCall(Func<Task<dynamic>> call)
         {
             try
@@ -93,7 +106,7 @@ namespace Artifacts
             {
                 // Network error, wait a minute and try again
                 Console.WriteLine($"Network outage: {ex.Message}");
-                await Task.Delay(60 * 1000);
+                await Task.Delay(10 * 1000);
                 return await ApiCall(call);
             }
             catch (ApiException ex)

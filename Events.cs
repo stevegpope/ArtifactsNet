@@ -41,7 +41,7 @@ namespace Artifacts
 
         internal async Task<List<ActiveEventSchema>> GetActiveEvents()
         {
-            var events = await Utils.ApiCall(async () =>
+            var events = await Utils.ApiCallGet(async () =>
             {
                 return await _api.GetAllActiveEventsEventsActiveGetAsync();
             });

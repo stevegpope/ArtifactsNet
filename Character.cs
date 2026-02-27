@@ -1,9 +1,6 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
-using Microsoft.Extensions.Options;
-using StackExchange.Redis;
-using static StackExchange.Redis.Role;
 
 namespace Artifacts
 {
@@ -92,6 +89,8 @@ namespace Artifacts
         {
             Console.WriteLine($"Moving {Name} to {locationType}, code {code}");
             var response = await Map.Instance.GetMapLayer(locationType, code);
+            if (response == null) return;
+
             if (response.Data != null && response.Data.Count != 0)
             {
                 while(true)
@@ -200,7 +199,7 @@ namespace Artifacts
             {
                 try
                 {
-                    var craftResponse = await Utils.ApiCall(async () =>
+                    await Utils.ApiCall(async () =>
                     {
                         var leftToGet = craftQuantity - itemsCrafted;
                         var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: leftToGet * 5);
@@ -625,9 +624,10 @@ namespace Artifacts
 
                 try
                 {
-                    var exchange = await BuyExchangeOrder(order.Id, amount);
-                    gotten += exchange.Data.Order.Quantity;
-                    remaining -= exchange.Data.Order.Quantity;
+                    await BuyExchangeOrder(order.Id, amount);
+
+                    gotten += amount;
+                    remaining -= amount;
                 }
                 catch (ApiException ex)
                 {
@@ -751,6 +751,8 @@ namespace Artifacts
                     {
                         return await _api.ActionGatheringMyNameActionGatheringPostAsync(Name);
                     });
+
+                    if (result == null) continue;
 
                     var schema = result as SkillResponseSchema;
                     Console.WriteLine($"XP: {schema.Data.Details.Xp}");
@@ -1033,6 +1035,8 @@ namespace Artifacts
                 {
                     var hp = Utils.Details[Name].Hp;
                     var result = await Fight(participants);
+                    if (result == null) continue;
+
                     lostLastFight = hp - Utils.Details[Name].Hp;
                     if (result.Data.Fight.Result == FightResult.Loss)
                     {
@@ -1517,7 +1521,7 @@ namespace Artifacts
         {
             Console.WriteLine("Fight!!");
 
-            var result = await Utils.ApiCall(async () =>
+            var result = await Utils.ApiCallGet(async () =>
             {
                 var response = await _api.ActionFightMyNameActionFightPostAsync(Name, new FightRequestSchema(participants));
                 Console.WriteLine($"Fight {response.Data.Fight.Result}!!!");
@@ -1853,7 +1857,7 @@ namespace Artifacts
             {
                 Console.WriteLine($"{inventoryAmount + bankAmount}/{Threshold} cooked, lets get fish to cook");
                 var recipes = GetRecipes("cooking");
-                var topDown = recipes.OrderByDescending(x => x.Level);
+                var topDown = recipes.Where(x => x.Level <= Utils.Details[Name].Level).OrderByDescending(x => x.Level);
                 foreach (var recipe in topDown)
                 {
                     if (recipe.Craft.Items.Count > 1) continue;
@@ -2003,7 +2007,10 @@ namespace Artifacts
                         }
 
                         var response = await Unequip(slotType);
-                        await DepositItem(response.Data.Item.Code, quantity);
+                        if (response != null)
+                        {
+                            await DepositItem(response.Data.Item.Code, quantity);
+                        }
                     }
                 }
 
@@ -2385,10 +2392,13 @@ namespace Artifacts
                     try
                     {
                         var claimedStuff = await ClaimItems(item.Id);
-                        Console.WriteLine($"Claimed {claimedStuff.Item.Gold}gp");
-                        foreach (var claimedItem in claimedStuff.Item.Items)
+                        if (claimedStuff != null)
                         {
-                            Console.WriteLine($"{claimedItem.Quantity} {claimedItem.Code}");
+                            Console.WriteLine($"Claimed {claimedStuff.Item.Gold}gp");
+                            foreach (var claimedItem in claimedStuff.Item.Items)
+                            {
+                                Console.WriteLine($"{claimedItem.Quantity} {claimedItem.Code}");
+                            }
                         }
 
                         claimed = true;
