@@ -284,7 +284,7 @@ namespace Artifacts
             }
         }
 
-        private async Task PerformTask()
+        internal async Task PerformTask()
         {
             await ExchangeCoins();
 

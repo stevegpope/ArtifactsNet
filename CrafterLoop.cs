@@ -68,57 +68,70 @@ namespace Artifacts
 
             while (true)
             {
-                await CheckForGold();
-                await ProcessEvents();
-
-                string skill = ChooseCraftingSkill();
-
-                int craftAmount;
-                switch (skill)
+                try
                 {
-                    case "weaponcrafting":
-                    case "gearcrafting":
-                    case "jewelrycrafting":
-                        craftAmount = 1;
-                        break;
-                    case "alchemy":
-                        craftAmount = 5;
-                        break;
-                    default:
-                        throw new Exception($"Unexpected skill {skill}");
+                    await CheckForGold();
+                    await ProcessEvents();
 
+                    if (_random.Next(10) == 0)
+                    {
+                        await _character.PerformTask();
+                    }
+
+                    string skill = ChooseCraftingSkill();
+
+                    int craftAmount;
+                    switch (skill)
+                    {
+                        case "weaponcrafting":
+                        case "gearcrafting":
+                        case "jewelrycrafting":
+                            craftAmount = 1;
+                            break;
+                        case "alchemy":
+                            craftAmount = 5;
+                            break;
+                        default:
+                            throw new Exception($"Unexpected skill {skill}");
+
+                    }
+
+                    var craftSkill = Utils.GetSkillCraft(skill);
+                    var level = _character.GetSkillLevel(skill);
+                    Console.WriteLine($"Crafter chose skill {skill} at level {level} with {craftSkill}");
+
+                    var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
+                    Console.WriteLine($"{items.Count} potential things to craft");
+
+                    var bankItems = await Bank.Instance.GetItems();
+
+                    var result = await CraftItems(craftAmount, level, items, bankItems);
+                    if (result.Recycle && result.Quantity == 1)
+                    {
+                        Console.WriteLine($"Recycle immediate {result.Quantity} {result.Code}");
+                        await _character.Recycle(result.Code, result.Quantity);
+                    }
+
+                    // Nobody can craft anything until alchemy 5
+                    if (result.Quantity == 0)
+                    {
+                        await _character.TrainGathering(5, skill);
+                    }
+
+                    // Go deposit the results in the bank
+                    await _character.MoveTo(MapContentType.Bank);
+                    await _character.DepositAllItems();
+
+                    // Recycle leftovers
+                    await Recycle();
                 }
-
-                var craftSkill = Utils.GetSkillCraft(skill);
-                var level = _character.GetSkillLevel(skill);
-                Console.WriteLine($"Crafter chose skill {skill} at level {level} with {craftSkill}");
-
-                var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
-                Console.WriteLine($"{items.Count} potential things to craft");
-
-                var bankItems = await Bank.Instance.GetItems();
-
-                var result = await CraftItems(craftAmount, level, items, bankItems);
-                if (result.Recycle && result.Quantity == 1)
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"Recycle immediate {result.Quantity} {result.Code}");
-                    await _character.Recycle(result.Code, result.Quantity);
+                    File.AppendAllText("errors.txt", $"[{DateTime.UtcNow}] {ex}\n");
                 }
-
-                // Nobody can craft anything until alchemy 5
-                if (result.Quantity == 0)
-                {
-                    await _character.TrainGathering(5, skill);
-                }
-
-                // Go deposit the results in the bank
-                await _character.MoveTo(MapContentType.Bank);
-                await _character.DepositAllItems();
-
-                // Recycle leftovers
-                await Recycle();
             }
         }
+
         private async Task CheckForGold()
         {
             var bankItems = await Bank.Instance.GetItems();
@@ -142,12 +155,16 @@ namespace Artifacts
 
         private string ChooseCraftingSkill()
         {
-            var skills = new List<string>([
-                "weaponcrafting",
-                "gearcrafting",
-                "jewelrycrafting",
-                "alchemy"
-            ]);
+            var skillMap = new Dictionary<string, string[]>
+            {
+                { "baz1", new[] { "weaponcrafting", "alchemy" } },
+                { "baz2", new[] { "weaponcrafting", "alchemy" } },
+                { "baz3", new[] { "gearcrafting", "alchemy" } },
+                { "baz4", new[] { "gearcrafting", "alchemy" } },
+                { "baz5", new[] { "jewelrycrafting", "alchemy" } },
+            };
+
+            var skills = skillMap[Name];
 
             var result = new List<string>();
 
