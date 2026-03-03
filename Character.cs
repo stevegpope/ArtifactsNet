@@ -1,6 +1,7 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using System.ComponentModel;
 
 namespace Artifacts
 {
@@ -187,7 +188,23 @@ namespace Artifacts
             var skillLevel = GetSkillLevel(item.Craft.Skill.ToString());
             if (item.Level > skillLevel - 10)
             {
-                await GearUpSkill("crafting", null);
+                try
+                {
+                    await GearUpSkill("crafting", null);
+                }
+                catch (ApiException ex)
+                {
+                    if (ex.ErrorCode == 497)
+                    {
+                        Console.WriteLine("Inventory full, cannot gear up");
+                        await DropOffNonComponents(item);
+                        await GearUpSkill("crafting", null);
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
 
             // Go to the crafting location
@@ -554,7 +571,7 @@ namespace Artifacts
             var resource = await Resources.Instance.GetResourceDrop(code);
             if (resource != null)
             {
-                var gathered = await GatherResources(code, doNotUse, remaining, item, resource);
+                var gathered = await GatherResources(doNotUse, remaining, item, resource);
                 return gathered + withdrawn;
             }
 
@@ -730,12 +747,29 @@ namespace Artifacts
             }) as NpcMerchantTransactionResponseSchema;
         }
 
-        private async Task<int> GatherResources(string code, ItemSchema doNotUse, int remaining, ItemSchema item, ResourceSchema resource)
+        private async Task<int> GatherResources(ItemSchema doNotUse, int remaining, ItemSchema item, ResourceSchema resource)
         {
-            Console.WriteLine($"Gathering {remaining} {code} for character {Name}");
+            Console.WriteLine($"Gathering {remaining} {item.Craft} for character {Name}");
             var skill = await Resources.Instance.GetResourceSkill(item);
 
-            await GearUpSkill(skill, doNotUse);
+            try
+            { 
+                await GearUpSkill(skill, doNotUse);
+            }
+            catch (ApiException ex)
+            {
+                if (ex.ErrorCode == 497)
+                {
+                    Console.WriteLine("Inventory full, cannot gear up");
+                    await DropOffNonComponents(item);
+                    await GearUpSkill("crafting", null);
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
             await MoveClosest(MapContentType.Resource, resource.Code);
 
             var gathered = 0;
@@ -743,7 +777,7 @@ namespace Artifacts
             while (leftToGet > 0)
             {
                 var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: (int)(leftToGet * Utils.LastCooldown));
-                Console.WriteLine($"{gathered}/{remaining} {code} ETA: {estimatedTime}");
+                Console.WriteLine($"{gathered}/{remaining} {item.Code} ETA: {estimatedTime}");
 
                 try
                 {
@@ -759,7 +793,7 @@ namespace Artifacts
                     foreach (var drop in schema.Data.Details.Items)
                     {
                         Console.WriteLine($"drop: {drop.Quantity} {drop.Code}");
-                        if (drop.Code == code)
+                        if (drop.Code == item.Code)
                         {
                             leftToGet -= drop.Quantity;
                             gathered += drop.Quantity;
@@ -775,11 +809,11 @@ namespace Artifacts
                     }
                     else if (ex.ErrorCode == 493)
                     {
-                        Console.WriteLine($"Not skilled enough to get {code}, going training");
+                        Console.WriteLine($"Not skilled enough to get {item.Code}, going training");
                         await TrainSkill(skill, item.Level);
 
-                        Console.WriteLine($"Back from training, gathering {leftToGet} {code}");
-                        return await GatherResources(code, doNotUse, remaining, item, resource);
+                        Console.WriteLine($"Back from training, gathering {leftToGet} {item.Code}");
+                        return await GatherResources(doNotUse, remaining, item, resource);
                     }
 
                     throw;
@@ -908,10 +942,17 @@ namespace Artifacts
             {
                 var details = await Bank.Instance.GetBankDetails();
                 var gold = details.Gold;
-                var quantity = Math.Min(total, gold);
-                Console.WriteLine($"Withdraw {quantity} gold");
-                await MoveTo(MapContentType.Bank);
-                return await WithdrawGold(quantity);
+                if (gold >= total)
+                {
+                    Console.WriteLine($"Withdraw {total} gold");
+                    await MoveTo(MapContentType.Bank);
+                    return await WithdrawGold(total);
+                }
+                else
+                {
+                    Console.WriteLine($"Not enough gold in the bank, only {gold} available");
+                    return 0;
+                }
             }
 
             var bankItems = await Bank.Instance.GetItems();
@@ -942,7 +983,7 @@ namespace Artifacts
 
         internal async Task TrainGathering(int level, string skill, ItemSchema doNotUse = null)
         {
-            Console.WriteLine($"Train {skill} to level {level}");
+            Console.WriteLine($"Train {skill} at level {level}");
             var items = Items.GetAllItems();
             var gatherItems = items.Where(i => i.Value.Type == "resource" && i.Value.Subtype == skill);
 
@@ -1008,7 +1049,20 @@ namespace Artifacts
                     if (await Rest())
                     {
                         Console.WriteLine("We cooked food, gear up again");
-                        await GearUpMonster(monster);
+                        try
+                        {
+                            await GearUpMonster(monster);
+                        }
+                        catch (ApiException ex)
+                        {
+                            if (ex.ErrorCode == 497)
+                            {
+                                Console.WriteLine("Inventory full, cannot fight");
+                                await MoveTo(MapContentType.Bank);
+                                await DepositExcept(new List<string>([code]));
+                                await GearUpMonster(monster);
+                            }
+                        }
                     }
                 }
 
@@ -1137,6 +1191,7 @@ namespace Artifacts
         internal async Task DepositAllItems()
         {
             Console.WriteLine($"Depositing all items for character {Name}");
+
             await DepositExcept(new List<string>());
         }
 
@@ -1212,7 +1267,6 @@ namespace Artifacts
             {
                 if (!string.IsNullOrEmpty(item.Code) && !excludeCodes.Contains(item.Code, StringComparer.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"Deposit {item.Quantity} {item.Code}");
                     items.Add(new SimpleItemSchema(item.Code, item.Quantity));
                 }
             }
@@ -1581,10 +1635,10 @@ namespace Artifacts
                 currentValue = Items.CalculateItemValueSkill(currentItem, skill);
             }
 
-            var bestInventoryItem = await GetBestItemFromInventorySkill(slotType, skill, doNotUse);
+            var bestInventoryItem = GetBestItemFromInventorySkill(slotType, skill, doNotUse);
             var inventoryValue = bestInventoryItem != null ? Items.CalculateItemValueSkill(bestInventoryItem, skill) : 0;
 
-            var bestBankItem = await GetBestItemFromBankSkill(slotType, skill, bankItems, doNotUse);
+            var bestBankItem = GetBestItemFromBankSkill(slotType, skill, bankItems, doNotUse);
             var bankValue = bestBankItem != null ? Items.CalculateItemValueSkill(bestBankItem, skill) : 0;
 
             var max = Math.Max(currentValue, Math.Max(bankValue, inventoryValue));
@@ -1617,7 +1671,7 @@ namespace Artifacts
             }
         }
 
-        private async Task<ItemSchema> GetBestItemFromBankSkill(ItemSlot slotType, string skill, List<SimpleItemSchema> bankItems, ItemSchema doNotUse)
+        private ItemSchema GetBestItemFromBankSkill(ItemSlot slotType, string skill, List<SimpleItemSchema> bankItems, ItemSchema doNotUse)
         {
             ItemSchema bestItem = null;
             foreach (var bankItem in bankItems)
@@ -1654,7 +1708,7 @@ namespace Artifacts
             return bestItem;
         }
 
-        private async Task<ItemSchema> GetBestItemFromInventorySkill(ItemSlot slotType, string skill, ItemSchema doNotUse)
+        private ItemSchema GetBestItemFromInventorySkill(ItemSlot slotType, string skill, ItemSchema doNotUse)
         {
             ItemSchema bestItem = null;
             foreach (var inventoryItem in Utils.Details[Name].Inventory)
@@ -1760,7 +1814,7 @@ namespace Artifacts
 
             if (found < Threshold)
             {
-                Console.WriteLine("Not enough food left, now we are the chef");
+                Console.WriteLine($"Not enough food left ({found/Threshold}), now we are the chef");
                 await ChefRun(found);
                 return true;
             }
@@ -1789,6 +1843,7 @@ namespace Artifacts
         {
             // Save room, just in case of inventory issues
             var space = GetFreeInventorySpace() / 2;
+            Console.WriteLine($"{quantity} food wanted, {space} space");
             if (space <= 0)
             {
                 Console.WriteLine("No room for food!");
@@ -1826,7 +1881,7 @@ namespace Artifacts
                         space -= withdrawn;
                         quantity -= withdrawn;
 
-                        if (space <= 0)
+                        if (space <= 0 || quantity == 0)
                         {
                             return found;
                         }

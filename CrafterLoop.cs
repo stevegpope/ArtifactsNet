@@ -44,6 +44,11 @@ namespace Artifacts
         {
             Console.WriteLine($"Starting crafter loop");
 
+            if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
+            {
+                await _character.PerformTask();
+            }
+
             var currentCraft = _craftManager.GetCurrentCraft();
             if (currentCraft != null)
             {
@@ -155,16 +160,7 @@ namespace Artifacts
 
         private string ChooseCraftingSkill()
         {
-            var skillMap = new Dictionary<string, string[]>
-            {
-                { "baz1", new[] { "weaponcrafting", "alchemy" } },
-                { "baz2", new[] { "weaponcrafting", "alchemy" } },
-                { "baz3", new[] { "gearcrafting", "alchemy" } },
-                { "baz4", new[] { "gearcrafting", "alchemy" } },
-                { "baz5", new[] { "jewelrycrafting", "alchemy" } },
-            };
-
-            var skills = skillMap[Name];
+            var skills = new[] { "weaponcrafting", "gearcrafting", "jewelrycrafting", "alchemy" };
 
             var result = new List<string>();
 
@@ -233,7 +229,13 @@ namespace Artifacts
             var bankItems = await Bank.Instance.GetItems();
             foreach (var item in items)
             {
-                if (item?.SellPrice == null || item.SellPrice < 10)
+                if (item?.SellPrice == null || item.SellPrice < 100)
+                {
+                    continue;
+                }
+
+                var itemDetails = Items.GetItem(item.Code);
+                if (itemDetails.Effects != null && itemDetails.Effects.Count > 0)
                 {
                     continue;
                 }
