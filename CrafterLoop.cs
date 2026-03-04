@@ -42,39 +42,39 @@ namespace Artifacts
 
         internal async Task RunAsync()
         {
-            Console.WriteLine($"Starting crafter loop");
-
-            if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
-            {
-                await _character.PerformTask();
-            }
-
-            var currentCraft = _craftManager.GetCurrentCraft();
-            if (currentCraft != null)
-            {
-                try
-                {
-                    Console.WriteLine("Continue crafting " + currentCraft.Code);
-                    await _character.CraftItems(Items.GetItem(currentCraft.Code), currentCraft.Quantity);
-                }
-                finally
-                {
-                    _craftManager.FinishCraft();
-                }
-            }
-            else
-            {
-                Console.WriteLine("No current craft, starting fresh");
-            }
-
-            // Start at the bank with no inventory
-            await _character.MoveTo(MapContentType.Bank);
-            await _character.DepositAllItems();
-
             while (true)
             {
                 try
                 {
+                    Console.WriteLine($"Starting crafter loop");
+
+                    if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
+                    {
+                        await _character.PerformTask();
+                    }
+
+                    var currentCraft = _craftManager.GetCurrentCraft();
+                    if (currentCraft != null)
+                    {
+                        try
+                        {
+                            Console.WriteLine("Continue crafting " + currentCraft.Code);
+                            await _character.CraftItems(Items.GetItem(currentCraft.Code), currentCraft.Quantity);
+                        }
+                        finally
+                        {
+                            _craftManager.FinishCraft();
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("No current craft, starting fresh");
+                    }
+
+                    // Start at the bank with no inventory
+                    await _character.MoveTo(MapContentType.Bank);
+                    await _character.DepositAllItems();
+
                     await CheckForGold();
                     await ProcessEvents();
 
