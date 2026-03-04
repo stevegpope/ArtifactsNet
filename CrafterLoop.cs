@@ -47,6 +47,8 @@ namespace Artifacts
                 try
                 {
                     Console.WriteLine($"Starting crafter loop");
+                    await CheckForGold();
+                    await ProcessEvents();
 
                     if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
                     {
@@ -75,8 +77,7 @@ namespace Artifacts
                     await _character.MoveTo(MapContentType.Bank);
                     await _character.DepositAllItems();
 
-                    await CheckForGold();
-                    await ProcessEvents();
+                    await MakeJewels();
 
                     if (_random.Next(10) == 0)
                     {
@@ -134,6 +135,44 @@ namespace Artifacts
                 {
                     File.AppendAllText("errors.txt", $"[{DateTime.UtcNow}] {ex}\n");
                 }
+            }
+        }
+
+        private async Task MakeJewels()
+        {
+            if (Utils.Details[Name].MiningLevel < 20)
+            {
+                return;
+            }
+
+            Console.WriteLine("Making jewels");
+            var bankItems = await Bank.Instance.GetItems();
+            string[] Jewels = new[] { "ruby", "sapphire", "emerald", "topaz" };
+            var recipes = _character.GetRecipes("mining").Where(x => Jewels.Contains(x.Code)).ToList();
+            var crafted = false;
+
+            foreach (var recipe in recipes)
+            {
+                var component = recipe.Craft.Items.First();
+                var bankItem = bankItems.FirstOrDefault(x => x.Code == component.Code);
+                if (bankItem != null)
+                {
+                    var amountToCraft = bankItem.Quantity / component.Quantity;
+                    if (amountToCraft > 0)
+                    {
+                        Console.WriteLine($"Crafting {amountToCraft} {recipe.Code} from {bankItem.Quantity} {component.Code}");
+                        if (await _character.CraftItems(Items.GetItem(recipe.Code), amountToCraft, bankOnly: true) > 0)
+                        {
+                            crafted = true;
+                        }
+                    }
+                }
+            }
+
+            if (crafted)
+            {
+                // Go deposit the results in the bank
+                await _character.DepositAllItems();
             }
         }
 
@@ -234,6 +273,7 @@ namespace Artifacts
                     continue;
                 }
 
+                // Skip items with effects
                 var itemDetails = Items.GetItem(item.Code);
                 if (itemDetails.Effects != null && itemDetails.Effects.Count > 0)
                 {
@@ -243,8 +283,10 @@ namespace Artifacts
                 var bankItem = bankItems.FirstOrDefault(x => x.Code == item.Code);
                 if (bankItem != null)
                 {
+                    var amount = GetSellQuantity(itemDetails, bankItem.Quantity);
+
                     await _character.MoveTo(MapContentType.Bank);
-                    var withdrawn = await _character.WithdrawItems(bankItem.Code, 100);
+                    var withdrawn = await _character.WithdrawItems(bankItem.Code, amount);
                     if (withdrawn > 0)
                     {
                         Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
@@ -253,6 +295,21 @@ namespace Artifacts
                     }
                 }
             }
+        }
+
+        private static int GetSellQuantity(ItemSchema itemDetails, int quantityOnHand)
+        {
+            var amountToSell = quantityOnHand;
+            var items = Items.GetAllItems();
+            var recipes = items.Values.Where(i => i.Craft != null && i.Craft.Items.Any(c => c.Code == itemDetails.Code));
+            if (recipes.Any())
+            {
+                // Leave enough to craft 5 of the next item up, we don't want to sell so many that we can't craft better items
+                amountToSell = quantityOnHand - 5;
+                Console.WriteLine($"We have {quantityOnHand} {itemDetails.Code}, recipes need it, so we will only sell {amountToSell}");
+            }
+
+            return Math.Min(amountToSell, 100);
         }
 
         private async Task<CraftResult> CraftItems(int craftAmount, int level, List<ItemSchema> items, List<SimpleItemSchema> bankItems)

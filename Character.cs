@@ -722,15 +722,13 @@ namespace Artifacts
                             Console.WriteLine($"Move to NPC {item.Npc}");
                             await Move(map.X, map.Y);
                         }
-                        catch (Exception ex)
+                        catch (ApiException ex)
                         {
-                            // We cannot move to the npc!
-                            Console.WriteLine($"Cannot move to {item.Npc}: {ex.Message}");
+                            Console.WriteLine($"Cannot buy {code} from {item.Npc}: {ex.ErrorContent}");
                             continue;
                         }
 
-                        await BuyNpcItem(code, total);
-                        return total;
+                        return await BuyNpcItem(code, total);
                     }
                 }
             }
@@ -738,13 +736,35 @@ namespace Artifacts
             return 0;
         }
 
-        private async Task<NpcMerchantTransactionResponseSchema> BuyNpcItem(string code, int remaining)
+        private async Task<int> BuyNpcItem(string code, int remaining)
         {
-            return await Utils.ApiCall(async () =>
+            var amount = remaining;
+            var bought = 0;
+
+            while (amount > 0)
             {
-                Console.WriteLine($"Buy {remaining} {code} from NPC");
-                return await _api.ActionNpcBuyItemMyNameActionNpcBuyPostAsync(Name, new NpcMerchantBuySchema(code, remaining));
-            }) as NpcMerchantTransactionResponseSchema;
+                // Max 100 purchase, we will use batches
+                var quantity = Math.Min(amount, 100);
+
+                try
+                {
+                    await Utils.ApiCall(async () =>
+                    {
+                        Console.WriteLine($"Buy {remaining} {code} from NPC");
+                        return await _api.ActionNpcBuyItemMyNameActionNpcBuyPostAsync(Name, new NpcMerchantBuySchema(code, quantity));
+                    });
+
+                    bought += quantity;
+                    amount -= quantity;
+                }
+                catch(ApiException ex)
+                {
+                    Console.WriteLine($"Error buying {quantity} {code} from NPC: {ex.ErrorContent}");
+                    break;
+                }
+            }
+
+            return bought;
         }
 
         private async Task<int> GatherResources(ItemSchema doNotUse, int remaining, ItemSchema item, ResourceSchema resource)
@@ -1934,7 +1954,7 @@ namespace Artifacts
             }
         }
 
-        private IEnumerable<ItemSchema> GetRecipes(string skill)
+        internal IEnumerable<ItemSchema> GetRecipes(string skill)
         {
             var items = Items.GetAllItems();
 
