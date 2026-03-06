@@ -64,6 +64,15 @@ namespace Artifacts
             }
         }
 
+        internal static ResourceSchema GetResource(string resourceCode)
+        {
+            if (_cache.TryGetValue(resourceCode, out var resource))
+            {
+                return resource; 
+            }
+            return null;
+        }
+
         internal async Task<ResourceSchema> GetResourceDrop(string drop)
         {
             ResourceSchema resource = null;

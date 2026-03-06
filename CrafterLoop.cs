@@ -145,7 +145,6 @@ namespace Artifacts
                 return;
             }
 
-            Console.WriteLine("Making jewels");
             var bankItems = await Bank.Instance.GetItems();
             string[] Jewels = new[] { "ruby", "sapphire", "emerald", "topaz" };
             var recipes = _character.GetRecipes("mining").Where(x => Jewels.Contains(x.Code)).ToList();
@@ -199,7 +198,16 @@ namespace Artifacts
 
         private string ChooseCraftingSkill()
         {
-            var skills = new[] { "weaponcrafting", "gearcrafting", "jewelrycrafting", "alchemy" };
+            var skillsPerCharacter = new Dictionary<string, string[]>
+            {
+                { "baz1", new[] { "weaponcrafting", "alchemy" } },
+                { "baz2", new[] { "weaponcrafting", "alchemy" } },
+                { "baz3", new[] { "gearcrafting", "alchemy" } },
+                { "baz4", new[] { "gearcrafting", "alchemy" } },
+                { "baz5", new[] { "jewelrycrafting", "alchemy" } },
+            };
+
+            var skills = skillsPerCharacter[Name];
 
             var result = new List<string>();
 
@@ -238,7 +246,33 @@ namespace Artifacts
                 {
                     await ProcessMonsterEvent(activeEvent);
                 }
+                else if (activeEvent.Map?.Interactions?.Content?.Type == MapContentType.Resource)
+                {
+                    await ProcessResourceEvent(activeEvent);
+                }
             }
+        }
+
+        private async Task ProcessResourceEvent(ActiveEventSchema activeEvent)
+        {
+            Console.WriteLine($"{activeEvent.Code} is present, trying to gather stuff");
+            var resource = Resources.GetResource(activeEvent.Map.Interactions.Content.Code);
+            if (resource == null)
+            {
+                Console.WriteLine($"No resources here");
+                return;
+            }
+
+            var gatheringSkill = resource.Skill;
+            var level = _character.GetSkillLevel(gatheringSkill.ToString());
+            if (resource.Level > level)
+            {
+                Console.WriteLine($"{resource.Code} ({resource.Level}) is too high level for us ({level})");
+                return;
+            }
+
+            await _character.GatherItems(resource.Code, 100, ignoreBank: true);
+            await _character.DepositAllItems();
         }
 
         private async Task ProcessMonsterEvent(ActiveEventSchema activeEvent)
