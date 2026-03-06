@@ -180,7 +180,6 @@ namespace Artifacts
             var found = await FetchCraftingItems(item, gatherQuantities, bankOnly, ignoreBank);
             if (found == 0)
             {
-                await PerformTask();
                 return 0;
             }
 
@@ -562,12 +561,6 @@ namespace Artifacts
                 return crafted + withdrawn;
             }
 
-            int amountFromNpcs = await GatherFromNpc(code, remaining);
-            if (amountFromNpcs > 0)
-            {
-                return amountFromNpcs + withdrawn;
-            }
-
             var resource = await Resources.Instance.GetResourceDrop(code);
             if (resource != null)
             {
@@ -580,6 +573,12 @@ namespace Artifacts
             {
                 var foughtFor = await GatherFromMonsters(code, remaining, monsters);
                 return foughtFor + withdrawn;
+            }
+
+            int amountFromNpcs = await GatherFromNpc(code, remaining);
+            if (amountFromNpcs > 0)
+            {
+                return amountFromNpcs + withdrawn;
             }
 
             int amountFromMarket = await GatherFromMarket(code, remaining);

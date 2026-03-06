@@ -307,40 +307,51 @@ namespace Artifacts
                     continue;
                 }
 
-                // Skip items with effects
                 var itemDetails = Items.GetItem(item.Code);
-                if (itemDetails.Effects != null && itemDetails.Effects.Count > 0)
-                {
-                    continue;
-                }
 
                 var bankItem = bankItems.FirstOrDefault(x => x.Code == item.Code);
                 if (bankItem != null)
                 {
-                    var amount = GetSellQuantity(itemDetails, bankItem.Quantity);
-
-                    await _character.MoveTo(MapContentType.Bank);
-                    var withdrawn = await _character.WithdrawItems(bankItem.Code, amount);
-                    if (withdrawn > 0)
+                    bankItems = await Bank.Instance.GetItems();
+                    var characters = await _character.GetAllCharacters();
+                    var amount = GetSellQuantity(itemDetails, bankItem.Quantity, characters, bankItems);
+                    if (amount > 0)
                     {
-                        Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
-                        await _character.Move(activeEvent.Map.X, activeEvent.Map.Y);
-                        await _character.SellNpc(bankItem.Code, withdrawn);
+                        await _character.MoveTo(MapContentType.Bank);
+                        var withdrawn = await _character.WithdrawItems(bankItem.Code, amount);
+                        if (withdrawn > 0)
+                        {
+                            Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
+                            await _character.Move(activeEvent.Map.X, activeEvent.Map.Y);
+                            await _character.SellNpc(bankItem.Code, withdrawn);
+                        }
                     }
                 }
             }
         }
 
-        private static int GetSellQuantity(ItemSchema itemDetails, int quantityOnHand)
+        private int GetSellQuantity(ItemSchema itemDetails, int bankAmount, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
         {
-            var amountToSell = quantityOnHand;
+            var amountToSell = bankAmount;
+
+            if (itemDetails.Effects != null && itemDetails.Effects.Count > 0)
+            {
+                // Leave 5 of an item, 10 of a ring
+                var currentAmount = CountAmountEverywhere(itemDetails.Code, characters, bankItems);
+                var limit = itemDetails.Type == "ring" ? 10 : 5;
+                if (currentAmount > limit)
+                {
+                    return Math.Min(currentAmount - limit, bankAmount);
+                }
+            }
+
             var items = Items.GetAllItems();
             var recipes = items.Values.Where(i => i.Craft != null && i.Craft.Items.Any(c => c.Code == itemDetails.Code));
             if (recipes.Any())
             {
                 // Leave enough to craft 5 of the next item up, we don't want to sell so many that we can't craft better items
-                amountToSell = quantityOnHand - 5;
-                Console.WriteLine($"We have {quantityOnHand} {itemDetails.Code}, recipes need it, so we will only sell {amountToSell}");
+                amountToSell = bankAmount - 5;
+                Console.WriteLine($"We have {bankAmount} {itemDetails.Code}, recipes need it, so we will only sell {amountToSell}");
             }
 
             return Math.Min(amountToSell, 100);
@@ -408,7 +419,7 @@ namespace Artifacts
 
                 if (!ignoreBankCheck)
                 {
-                    var currentAmount = await CountAmountEverywhere(item.Code, characters, bankItems);
+                    var currentAmount = CountAmountEverywhere(item.Code, characters, bankItems);
                     var limit = item.Type == "ring" ? 10 : 5;
                     if (currentAmount >= limit)
                     {
@@ -465,7 +476,7 @@ namespace Artifacts
             return item.Type == "resource" && item.Subtype != "task";
         }
 
-        private static async Task<int> CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
+        private static int CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
         {
             var total = 0;
 
@@ -549,7 +560,7 @@ namespace Artifacts
                 return 0;
             }
 
-            var currentAmount = await CountAmountEverywhere(bankItem.Code, characters, bankItems);
+            var currentAmount = CountAmountEverywhere(bankItem.Code, characters, bankItems);
 
             // Recycle any more than 5 (10 for rings)
             var limit = 5;
@@ -578,7 +589,7 @@ namespace Artifacts
                     continue;
                 }
 
-                var bankItemAmount = await CountAmountEverywhere(otherBankItem.Code, characters, bankItems);
+                var bankItemAmount = CountAmountEverywhere(otherBankItem.Code, characters, bankItems);
                 if (bankItemAmount < limit)
                 {
                     continue;
