@@ -146,8 +146,7 @@ namespace Artifacts
             }
 
             var bankItems = await Bank.Instance.GetItems();
-            string[] Jewels = new[] { "ruby", "sapphire", "emerald", "topaz" };
-            var recipes = _character.GetRecipes("mining").Where(x => Jewels.Contains(x.Code)).ToList();
+            var recipes = _character.GetRecipes("mining");
             var crafted = false;
 
             foreach (var recipe in recipes)
@@ -318,7 +317,7 @@ namespace Artifacts
                     if (amount > 0)
                     {
                         await _character.MoveTo(MapContentType.Bank);
-                        var withdrawn = await _character.WithdrawItems(bankItem.Code, amount);
+                        var withdrawn = await _character.WithdrawItems(bankItem.Code);
                         if (withdrawn > 0)
                         {
                             Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
