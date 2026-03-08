@@ -107,9 +107,15 @@ namespace Artifacts
                     Console.WriteLine($"Crafter chose skill {skill} at level {level} with {craftSkill}");
 
                     var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
-                    Console.WriteLine($"{items.Count} potential things to craft");
-
                     var bankItems = await Bank.Instance.GetItems();
+
+                    // Filter out items retrieved from bosses
+                    //items = FilterBossItems(items, bankItems);
+
+                    // Filter out items that require a resource we can't get if we don't have the resource in the bank
+                    items = FilterTaskItems(items, bankItems);
+
+                    Console.WriteLine($"{items.Count} potential things to craft");
 
                     var result = await CraftItems(craftAmount, level, items, bankItems);
                     if (result.Recycle && result.Quantity == 1)
@@ -138,6 +144,67 @@ namespace Artifacts
             }
         }
 
+        private List<ItemSchema> FilterTaskItems(List<ItemSchema> items, List<SimpleItemSchema> bankItems)
+        {
+            var result = new List<ItemSchema>();
+            var allItems = Items.GetAllItems();
+            var taskItems = allItems.Values.Where(i => i.Type == "resource" && i.Subtype == "task");
+
+            foreach (var item in items)
+            {
+                var taskComponent = item.Craft.Items.FirstOrDefault(i => taskItems.Any(t => t.Code == i.Code));
+                if (taskComponent != null)
+                {
+                    var bankItem = bankItems.FirstOrDefault(x => x.Code == taskComponent.Code);
+                    if (bankItem == null || bankItem.Quantity == 0)
+                    {
+                        Console.WriteLine($"Filtering out {item.Code} because it needs {taskComponent.Code}");
+                    }
+                    else
+                    {
+                        result.Add(item);
+                    }
+                }
+                else
+                {
+                    result.Add(item);
+                }
+            }
+
+            return result;
+        }
+
+        private List<ItemSchema> FilterBossItems(List<ItemSchema> items, List<SimpleItemSchema> bankItems)
+        {
+            var result = new List<ItemSchema>();
+            var monsters = Monsters.GetAllMonsters();
+            var bosses = monsters.Values.Where(m => m.Type == MonsterType.Boss);
+            var bossDrops = bosses.SelectMany(b => b.Drops);
+
+            foreach (var item in items)
+            {
+                var component = item.Craft.Items.FirstOrDefault(i => bossDrops.Any(d => i.Code == d.Code));
+                if (component != null)
+                {
+                    var bankItem = bankItems.FirstOrDefault(x => x.Code == component.Code);
+                    if (bankItem == null || bankItem.Quantity == 0)
+                    {
+                        Console.WriteLine($"Filtering out {item.Code} because it drops from a boss, and we have none");
+                    }
+                    else
+                    {
+                        result.Add(item);
+                    }
+                }
+                else
+                {
+                    result.Add(item);
+                }
+            }
+
+            return result;
+        }
+
         private async Task MakeJewels()
         {
             if (Utils.Details[Name].MiningLevel < 20)
@@ -151,6 +218,11 @@ namespace Artifacts
 
             foreach (var recipe in recipes)
             {
+                if (recipe.Craft.Items.Count != 1)
+                {
+                    continue;
+                }
+
                 var component = recipe.Craft.Items.First();
                 var bankItem = bankItems.FirstOrDefault(x => x.Code == component.Code);
                 if (bankItem != null)

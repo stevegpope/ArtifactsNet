@@ -46,6 +46,11 @@ namespace Artifacts
             }
         }
 
+        internal static Dictionary<string, MonsterSchema> GetAllMonsters()
+        {
+            return _cache;
+        }
+
         internal DataPageMonsterSchema GetMonsters(int maxLevel, string dropCode = null)
         {
             var monsters = _api.GetAllMonstersMonstersGet(maxLevel: maxLevel, drop: dropCode);

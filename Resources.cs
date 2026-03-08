@@ -40,7 +40,7 @@ namespace Artifacts
             _api = new ResourcesApi(httpClient, config);
         }
 
-        private async Task CacheItems()
+        internal async Task CacheItems()
         {
             if (_cache == null)
             {

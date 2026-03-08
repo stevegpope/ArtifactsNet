@@ -2341,8 +2341,12 @@ namespace Artifacts
                     if (ex.ErrorCode == 483)
                     {
                         // Not enough hp to unequip
-                        Console.WriteLine($"Not enough HP to unequip {slotType}");
-                        await Rest();
+                        Console.WriteLine($"Not enough HP to unequip {slotType}, resting");
+                        await Utils.ApiCall(async () =>
+                        {
+                            return await _api.ActionRestMyNameActionRestPostAsync(Name);
+                        });
+
                         return await Unequip(slotType);
                     }
                     else

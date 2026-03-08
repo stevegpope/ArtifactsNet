@@ -52,6 +52,7 @@ namespace Artifacts
             Events.Config(configuration, httpClient);
             Npcs.Config(configuration, httpClient);
             Resources.Config(configuration, httpClient);
+            await Resources.Instance.CacheItems();
             Bank.Config(configuration, httpClient);
 
             var character = new Character(

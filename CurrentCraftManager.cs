@@ -27,12 +27,22 @@
 
         internal CraftInfo GetCurrentCraft()
         {
+            // If we are in the debugger, we want to return null
+            if (System.Diagnostics.Debugger.IsAttached)
+            {
+                return null;
+            }
+
             if (!File.Exists(_filename))
             {
                 return null;
             }
 
             var current = File.ReadAllText(_filename);
+            if (string.IsNullOrEmpty(current))
+            {
+                return null;
+            }
 
             return new CraftInfo
             {
