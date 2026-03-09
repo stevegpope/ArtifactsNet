@@ -9,6 +9,7 @@ namespace Artifacts
         private NPCsApi _api;
         private static Configuration _config;
         private static HttpClient _httpClient;
+        private static Dictionary<string, NPCSchema> _cache;
 
         internal static Npcs Instance => lazy.Value;
 
@@ -39,34 +40,38 @@ namespace Artifacts
             _api = new NPCsApi(httpClient, config);
         }
 
-        internal async Task<NPCItem> FindNpcItem(string code)
+        internal async Task CacheNpcs()
         {
-            var page = await Utils.ApiCallGet(async () =>
+            if (_cache == null)
             {
-                return await _api.GetAllNpcsItemsNpcsItemsGetAsync(code);
-            }) as DataPageNPCItem;
+                Console.WriteLine("Caching NPCs");
+                _cache = new Dictionary<string, NPCSchema>();
+                var pageNum = 1;
+                while (true)
+                {
+                    var page = await _api.GetAllNpcsNpcsDetailsGetAsync(page: pageNum);
+                    foreach (var item in page.Data)
+                    {
+                        _cache[item.Code] = item;
+                    }
 
-            if (page == null || page.Data == null || page.Data.Count == 0)
-            {
-                return null;
+                    pageNum++;
+                    if (pageNum > page.Pages)
+                    {
+                        break;
+                    }
+                }
             }
-
-            return page.Data.First();
         }
 
-        internal async Task<List<NPCItem>> GetNpcItems(string code)
+        internal static Dictionary<string, NPCSchema> GetAllNpcs()
         {
-            var items = await Utils.ApiCallGet(async () =>
-            {
-                return await _api.GetNpcItemsNpcsItemsCodeGetAsync(code);
-            });
+            return _cache;
+        }
 
-            if (items is DataPageNPCItem itemPage)
-            {
-                return itemPage.Data;
-            }
-
-            return Enumerable.Empty<NPCItem>().ToList();
+        internal List<SimpleNPCItem> GetNpcItems(string npcCode)
+        {
+            return _cache[npcCode].Items;
         }
     }
 }

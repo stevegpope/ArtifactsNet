@@ -92,11 +92,11 @@ namespace Artifacts
             var response = await Map.Instance.GetMapLayer(locationType, code);
             if (response == null) return;
 
-            if (response.Data != null && response.Data.Count != 0)
+            if (response != null && response.Count != 0)
             {
                 while(true)
                 {
-                    MapSchema location = GetClosest(response.Data);
+                    MapSchema location = GetClosest(response);
                     try
                     {
                         await Move(location.X, location.Y);
@@ -105,7 +105,7 @@ namespace Artifacts
                     catch (ApiException ex)
                     {
                         Console.WriteLine($"Can't go to {location.X}, {location.Y}: {ex.ErrorContent}");
-                        response.Data.Remove(location);
+                        response.Remove(location);
                     }
                 }
             }
@@ -209,37 +209,44 @@ namespace Artifacts
             // Go to the crafting location
             await MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
 
-            // Craft the items one at a time until we can't make any more. We may be using inventory items from before, or we may run out of gathered items.
-            var itemsCrafted = 0;
-            for (int index = 0; index < craftQuantity; index++)
-            {
-                try
-                {
-                    await Utils.ApiCall(async () =>
-                    {
-                        var leftToGet = craftQuantity - itemsCrafted;
-                        var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: leftToGet * 5);
-                        Console.WriteLine($"Craft {itemsCrafted + 1}/{craftQuantity} {item.Code} ETA: {estimatedTime}");
-                        var response = await _api.ActionCraftingMyNameActionCraftingPostAsync(Name, new CraftingSchema(item.Code, 1));
-                        Console.WriteLine($"{Name} Xp: {response.Data.Details.Xp}");
-                        return response;
-                    });
-                }
-                catch (ApiException ex)
-                {
-                    if (ex.ErrorCode == 478)
-                    {
-                        Console.WriteLine($"Ran out of components creating items");
-                        item.PrintCraftComponents();
-                    }
+            var quantity = CalculateCraftQuantity(item.Craft, craftQuantity);
 
-                    break;
+            try
+            {
+                await Utils.ApiCall(async () =>
+                {
+                    Console.WriteLine($"Craft {quantity} {item.Code}");
+                    var response = await _api.ActionCraftingMyNameActionCraftingPostAsync(Name, new CraftingSchema(item.Code, quantity));
+                    Console.WriteLine($"{Name} Xp: {response.Data.Details.Xp}");
+                    Console.WriteLine($"{Name} crafted {quantity} {item.Code}");
+                    return response;
+                });
+            }
+            catch (ApiException ex)
+            {
+                Console.WriteLine($"Error crafting {item.Code}: {ex.ErrorContent}");
+
+                if (ex.ErrorCode == 478)
+                {
+                    Console.WriteLine($"Ran out of components creating items");
+                    item.PrintCraftComponents();
                 }
-                itemsCrafted++;
             }
             
-            Console.WriteLine($"Crafted {itemsCrafted} {item.Code} for character {Name}");
-            return itemsCrafted;
+            return quantity;
+        }
+
+        private int CalculateCraftQuantity(CraftSchema craft, int craftQuantity)
+        {
+            // Calculate how many we can make with the current inventory
+            var max = 0;
+            foreach(var component in craft.Items)
+            {
+                var owned = Utils.Details[Name].Inventory.Where(i => i.Code == component.Code).Sum(i => i.Quantity);
+                max = Math.Max(max, owned / component.Quantity);
+            }
+
+            return Math.Min(max, craftQuantity);
         }
 
         private async Task<int> FetchCraftingItems(ItemSchema item, Dictionary<string, int> gatherQuantities, bool bankOnly, bool ignoreBank)
@@ -521,11 +528,9 @@ namespace Artifacts
         {
             Console.WriteLine($"Moving to closest {code} for character {Name}");
             var response = await Map.Instance.GetMapLayer(contentType, code);
-            if (response.Data != null && response.Data.Count != 0)
+            if (response != null && response.Count != 0)
             {
-                var locations = response.Data;
-
-                var location = GetClosest(locations);
+                var location = GetClosest(response);
                 await Move(location.X, location.Y);
             }
             else
@@ -585,7 +590,7 @@ namespace Artifacts
             }
 
             var monsters = Monsters.Instance.GetMonsters(maxLevel: 100, dropCode: item.Code);
-            if (monsters.Data.Count != 0)
+            if (monsters?.Count != 0)
             {
                 var foughtFor = await GatherFromMonsters(code, remaining, monsters);
                 return foughtFor + withdrawn;
@@ -701,17 +706,19 @@ namespace Artifacts
 
         private async Task<int> GatherFromNpc(string code, int total)
         {
-            var item = await Npcs.Instance.FindNpcItem(code);
+            var npcs = Npcs.GetAllNpcs();
+            var npc = npcs.FirstOrDefault(n => n.Value.Items.Any(i => i.Code == code)).Value;
+            var item = npc?.Items.FirstOrDefault(i => i.Code == code);
             if (item != null && item?.BuyPrice > 0)
             {
-                if (item.Npc == "tasks_trader") return 0;
+                if (npc.Code == "tasks_trader") return 0;
 
                 Console.WriteLine($"Try to buy {total} {code} from NPC");
-                var maps = await Map.Instance.GetMapLayer(MapContentType.Npc, item.Npc);
-                while (maps.Data.Count != 0)
+                var maps = await Map.Instance.GetMapLayer(MapContentType.Npc, npc.Code);
+                while (maps.Count != 0)
                 {
-                    var map = maps.Data.First();
-                    maps.Data.Remove(map);
+                    var map = maps.First();
+                    maps.Remove(map);
 
                     if (map.Layer == MapLayer.Overworld)
                     {
@@ -734,12 +741,12 @@ namespace Artifacts
 
                         try
                         {
-                            Console.WriteLine($"Move to NPC {item.Npc}");
+                            Console.WriteLine($"Move to NPC {npc.Code}");
                             await Move(map.X, map.Y);
                         }
                         catch (ApiException ex)
                         {
-                            Console.WriteLine($"Cannot buy {code} from {item.Npc}: {ex.ErrorContent}");
+                            Console.WriteLine($"Cannot buy {code} from {npc.Code}: {ex.ErrorContent}");
                             continue;
                         }
 
@@ -751,9 +758,9 @@ namespace Artifacts
             return 0;
         }
 
-        private async Task<int> BuyNpcItem(string code, int remaining)
+        internal async Task<int> BuyNpcItem(string code, int amountToPurchase)
         {
-            var amount = remaining;
+            var amount = amountToPurchase;
             var bought = 0;
 
             while (amount > 0)
@@ -765,7 +772,7 @@ namespace Artifacts
                 {
                     await Utils.ApiCall(async () =>
                     {
-                        Console.WriteLine($"Buy {remaining} {code} from NPC");
+                        Console.WriteLine($"Buy {amountToPurchase} {code} from NPC");
                         return await _api.ActionNpcBuyItemMyNameActionNpcBuyPostAsync(Name, new NpcMerchantBuySchema(code, quantity));
                     });
 
@@ -858,9 +865,9 @@ namespace Artifacts
             return gathered;
         }
 
-        private async Task<int> GatherFromMonsters(string code, int remaining, DataPageMonsterSchema monsters)
+        private async Task<int> GatherFromMonsters(string code, int remaining, List<MonsterSchema> monsters)
         {
-            var monster = monsters.Data.MinBy(x => x.Level);
+            var monster = monsters.MinBy(x => x.Level);
             Console.WriteLine($"Need to fight for {code}, chasing {monster}");
 
             if (monster.Level > Utils.Details[Name].Level || monster.Type == MonsterType.Boss)
@@ -876,7 +883,7 @@ namespace Artifacts
         internal async Task TrainFighting(int level)
         {
             var maxLevel = Math.Max(1, Utils.Details[Name].Level - 1);
-            var monsters = Monsters.Instance.GetMonsters(maxLevel).Data.Where(x => x.Type != MonsterType.Boss);
+            var monsters = Monsters.Instance.GetMonsters(maxLevel).Where(x => x.Type != MonsterType.Boss);
             var fightList = monsters.OrderBy(x => x.Level).ToList();
             var lastXp = 0;
 
@@ -949,7 +956,7 @@ namespace Artifacts
                             {
                                 Console.WriteLine($"Less XP from {monster.Code}, getting new monsters");
                                 lastXp = 0;
-                                monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1).Data.Where(x => x.Type != MonsterType.Boss);
+                                monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1).Where(x => x.Type != MonsterType.Boss);
                                 fightList = monsters.Where(x => x.Level > Utils.Details[Name].Level - 10).OrderBy(x => x.Level).ToList();
                                 break;
                             }
@@ -1069,7 +1076,7 @@ namespace Artifacts
         private async Task<int> FightDrops(string monster, string code, int remaining)
         {
             await GearUpMonster(monster);
-            var monsterSchema = await Monsters.GetMonster(monster);
+            var monsterSchema = Monsters.GetMonster(monster);
 
             var lostLastFight = 0;
             var losses = 0;
@@ -1437,6 +1444,9 @@ namespace Artifacts
             var monstersKilled = 0;
             var losses = 0;
 
+            var monsterSchema = Monsters.GetMonster(monster);
+            await TrainFighting(monsterSchema.Level + 1);
+
             await GearUpMonster(monster);
 
             while(monstersKilled < total)
@@ -1474,6 +1484,7 @@ namespace Artifacts
                         {
                             Console.WriteLine($"Training up to level {Utils.Details[Name].Level + 1}");
                             await TrainFighting(Utils.Details[Name].Level + 1);
+                            await GearUpMonster(monster);
                             continue;
                         }
                     }
@@ -1782,8 +1793,10 @@ namespace Artifacts
                 return;
             }
 
-            var monster = await Monsters.GetMonster(monsterCode);
+            var monster = Monsters.GetMonster(monsterCode);
             var bankItems = await Bank.Instance.GetItems();
+
+            await GetFood();
 
             // The damage bonuses of supplementary equipment do not count if the weapon does not have the damage type
             var weapon = await EquipBestForMonster(Utils.Details[Name].WeaponSlot, ItemSlot.Weapon, monster, bankItems, null);
@@ -1803,11 +1816,6 @@ namespace Artifacts
             await EquipBestForMonster(Utils.Details[Name].Utility2Slot, ItemSlot.Utility2, monster, bankItems, weapon);
             await EquipBestForMonster(Utils.Details[Name].BagSlot, ItemSlot.Bag, monster, bankItems, weapon);
             await EquipBestForMonster(Utils.Details[Name].RuneSlot, ItemSlot.Rune, monster, bankItems, weapon);
-
-            if (await GetFood())
-            {
-                await GearUpMonster(monster.Code);
-            }
         }
 
         internal int GetSkillLevel(string skill)
@@ -2475,26 +2483,23 @@ namespace Artifacts
             var claimed = false;
             foreach (var item in pendingItems)
             {
-                if (!item.ClaimedAt.HasValue)
+                try
                 {
-                    try
+                    var claimedStuff = await ClaimItems(item.Id);
+                    if (claimedStuff != null)
                     {
-                        var claimedStuff = await ClaimItems(item.Id);
-                        if (claimedStuff != null)
+                        Console.WriteLine($"Claimed {claimedStuff.Item.Gold}gp");
+                        foreach (var claimedItem in claimedStuff.Item.Items)
                         {
-                            Console.WriteLine($"Claimed {claimedStuff.Item.Gold}gp");
-                            foreach (var claimedItem in claimedStuff.Item.Items)
-                            {
-                                Console.WriteLine($"{claimedItem.Quantity} {claimedItem.Code}");
-                            }
+                            Console.WriteLine($"{claimedItem.Quantity} {claimedItem.Code}");
                         }
+                    }
 
-                        claimed = true;
-                    }
-                    catch (ApiException ex)
-                    {
-                        Console.WriteLine($"Error claiming: {ex.ErrorContent}");
-                    }
+                    claimed = true;
+                }
+                catch (ApiException ex)
+                {
+                    Console.WriteLine($"Error claiming: {ex.ErrorContent}");
                 }
             }
 

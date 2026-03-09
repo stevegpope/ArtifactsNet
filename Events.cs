@@ -46,12 +46,7 @@ namespace Artifacts
                 return await _api.GetAllActiveEventsEventsActiveGetAsync();
             });
 
-            if (events is DataPageActiveEventSchema eventPage)
-            {
-                return eventPage.Data;
-            }
-
-            return Enumerable.Empty<ActiveEventSchema>().ToList();
+            return (events as StaticDataPageActiveEventSchema).Data;
         }
     }
 }

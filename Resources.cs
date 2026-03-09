@@ -75,19 +75,7 @@ namespace Artifacts
 
         internal async Task<ResourceSchema> GetResourceDrop(string drop)
         {
-            ResourceSchema resource = null;
-            await Utils.ApiCallGet(async () =>
-            {
-                var result = await _api.GetAllResourcesResourcesGetAsync(drop: drop);
-                var data = result.Data;
-                if (data.Count != 0)
-                {
-                    resource = result.Data.FirstOrDefault();
-                }
-                return result;
-            });
-
-            return resource;
+            return _cache.Values.FirstOrDefault(resource => resource.Drops.Any(d => d.Code == drop));
         }
 
         internal async Task<string> GetResourceSkill(ItemSchema item)

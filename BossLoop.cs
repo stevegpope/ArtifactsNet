@@ -36,7 +36,7 @@ namespace Artifacts
             var topGuys = characters.OrderByDescending(x => Utils.Details[x.Name].Level);
 
             const string boss = "king_slime";
-            var monster = await Monsters.GetMonster(boss);
+            var monster = Monsters.GetMonster(boss);
 
             static async Task gearUp(Character character)
             {

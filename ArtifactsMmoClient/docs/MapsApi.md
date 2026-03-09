@@ -11,7 +11,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getallmapsmapsget"></a>
 # **GetAllMapsMapsGet**
-> DataPageMapSchema GetAllMapsMapsGet (MapLayer? layer = null, MapContentType? contentType = null, string? contentCode = null, bool? hideBlockedMaps = null, int? page = null, int? size = null)
+> StaticDataPageMapSchema GetAllMapsMapsGet (MapLayer? layer = null, MapContentType? contentType = null, string? contentCode = null, bool? hideBlockedMaps = null, int? page = null, int? size = null)
 
 Get All Maps
 
@@ -48,7 +48,7 @@ namespace Example
             try
             {
                 // Get All Maps
-                DataPageMapSchema result = apiInstance.GetAllMapsMapsGet(layer, contentType, contentCode, hideBlockedMaps, page, size);
+                StaticDataPageMapSchema result = apiInstance.GetAllMapsMapsGet(layer, contentType, contentCode, hideBlockedMaps, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -69,7 +69,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Maps
-    ApiResponse<DataPageMapSchema> response = apiInstance.GetAllMapsMapsGetWithHttpInfo(layer, contentType, contentCode, hideBlockedMaps, page, size);
+    ApiResponse<StaticDataPageMapSchema> response = apiInstance.GetAllMapsMapsGetWithHttpInfo(layer, contentType, contentCode, hideBlockedMaps, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -95,7 +95,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageMapSchema**](DataPageMapSchema.md)
+[**StaticDataPageMapSchema**](StaticDataPageMapSchema.md)
 
 ### Authorization
 
@@ -116,7 +116,7 @@ No authorization required
 
 <a id="getlayermapsmapslayerget"></a>
 # **GetLayerMapsMapsLayerGet**
-> DataPageMapSchema GetLayerMapsMapsLayerGet (MapLayer layer, MapContentType? contentType = null, string? contentCode = null, bool? hideBlockedMaps = null, int? page = null, int? size = null)
+> StaticDataPageMapSchema GetLayerMapsMapsLayerGet (MapLayer layer, MapContentType? contentType = null, string? contentCode = null, bool? hideBlockedMaps = null, int? page = null, int? size = null)
 
 Get Layer Maps
 
@@ -153,7 +153,7 @@ namespace Example
             try
             {
                 // Get Layer Maps
-                DataPageMapSchema result = apiInstance.GetLayerMapsMapsLayerGet(layer, contentType, contentCode, hideBlockedMaps, page, size);
+                StaticDataPageMapSchema result = apiInstance.GetLayerMapsMapsLayerGet(layer, contentType, contentCode, hideBlockedMaps, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -174,7 +174,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get Layer Maps
-    ApiResponse<DataPageMapSchema> response = apiInstance.GetLayerMapsMapsLayerGetWithHttpInfo(layer, contentType, contentCode, hideBlockedMaps, page, size);
+    ApiResponse<StaticDataPageMapSchema> response = apiInstance.GetLayerMapsMapsLayerGetWithHttpInfo(layer, contentType, contentCode, hideBlockedMaps, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -200,7 +200,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageMapSchema**](DataPageMapSchema.md)
+[**StaticDataPageMapSchema**](StaticDataPageMapSchema.md)
 
 ### Authorization
 

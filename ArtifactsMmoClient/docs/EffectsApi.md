@@ -9,7 +9,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getalleffectseffectsget"></a>
 # **GetAllEffectsEffectsGet**
-> DataPageEffectSchema GetAllEffectsEffectsGet (int? page = null, int? size = null)
+> StaticDataPageEffectSchema GetAllEffectsEffectsGet (int? page = null, int? size = null)
 
 Get All Effects
 
@@ -42,7 +42,7 @@ namespace Example
             try
             {
                 // Get All Effects
-                DataPageEffectSchema result = apiInstance.GetAllEffectsEffectsGet(page, size);
+                StaticDataPageEffectSchema result = apiInstance.GetAllEffectsEffectsGet(page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -63,7 +63,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Effects
-    ApiResponse<DataPageEffectSchema> response = apiInstance.GetAllEffectsEffectsGetWithHttpInfo(page, size);
+    ApiResponse<StaticDataPageEffectSchema> response = apiInstance.GetAllEffectsEffectsGetWithHttpInfo(page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -85,7 +85,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageEffectSchema**](DataPageEffectSchema.md)
+[**StaticDataPageEffectSchema**](StaticDataPageEffectSchema.md)
 
 ### Authorization
 

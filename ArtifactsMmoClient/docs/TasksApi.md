@@ -11,7 +11,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getalltasksrewardstasksrewardsget"></a>
 # **GetAllTasksRewardsTasksRewardsGet**
-> DataPageDropRateSchema GetAllTasksRewardsTasksRewardsGet (int? page = null, int? size = null)
+> StaticDataPageDropRateSchema GetAllTasksRewardsTasksRewardsGet (int? page = null, int? size = null)
 
 Get All Tasks Rewards
 
@@ -44,7 +44,7 @@ namespace Example
             try
             {
                 // Get All Tasks Rewards
-                DataPageDropRateSchema result = apiInstance.GetAllTasksRewardsTasksRewardsGet(page, size);
+                StaticDataPageDropRateSchema result = apiInstance.GetAllTasksRewardsTasksRewardsGet(page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -65,7 +65,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Tasks Rewards
-    ApiResponse<DataPageDropRateSchema> response = apiInstance.GetAllTasksRewardsTasksRewardsGetWithHttpInfo(page, size);
+    ApiResponse<StaticDataPageDropRateSchema> response = apiInstance.GetAllTasksRewardsTasksRewardsGetWithHttpInfo(page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -87,7 +87,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageDropRateSchema**](DataPageDropRateSchema.md)
+[**StaticDataPageDropRateSchema**](StaticDataPageDropRateSchema.md)
 
 ### Authorization
 
@@ -108,7 +108,7 @@ No authorization required
 
 <a id="getalltaskstaskslistget"></a>
 # **GetAllTasksTasksListGet**
-> DataPageTaskFullSchema GetAllTasksTasksListGet (int? minLevel = null, int? maxLevel = null, Skill? skill = null, TaskType? type = null, int? page = null, int? size = null)
+> StaticDataPageTaskFullSchema GetAllTasksTasksListGet (int? minLevel = null, int? maxLevel = null, Skill? skill = null, TaskType? type = null, int? page = null, int? size = null)
 
 Get All Tasks
 
@@ -145,7 +145,7 @@ namespace Example
             try
             {
                 // Get All Tasks
-                DataPageTaskFullSchema result = apiInstance.GetAllTasksTasksListGet(minLevel, maxLevel, skill, type, page, size);
+                StaticDataPageTaskFullSchema result = apiInstance.GetAllTasksTasksListGet(minLevel, maxLevel, skill, type, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -166,7 +166,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Tasks
-    ApiResponse<DataPageTaskFullSchema> response = apiInstance.GetAllTasksTasksListGetWithHttpInfo(minLevel, maxLevel, skill, type, page, size);
+    ApiResponse<StaticDataPageTaskFullSchema> response = apiInstance.GetAllTasksTasksListGetWithHttpInfo(minLevel, maxLevel, skill, type, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -192,7 +192,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageTaskFullSchema**](DataPageTaskFullSchema.md)
+[**StaticDataPageTaskFullSchema**](StaticDataPageTaskFullSchema.md)
 
 ### Authorization
 

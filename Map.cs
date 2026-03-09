@@ -40,10 +40,10 @@ namespace Artifacts
             _api = new MapsApi(httpClient, config);
         }
 
-        internal async Task<DataPageMapSchema> GetMapLayer(MapContentType contentType, string code = null, MapLayer layer = MapLayer.Overworld)
+        internal async Task<List<MapSchema>> GetMapLayer(MapContentType contentType, string code = null, MapLayer layer = MapLayer.Overworld)
         {
             var mapSchema = await Utils.ApiCallGet(async () => await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code));
-            return mapSchema as DataPageMapSchema;
+            return (mapSchema as StaticDataPageMapSchema).Data;
         }
 
         internal async Task<MapSchema> GetMapPosition(int x, int y, MapLayer layer = MapLayer.Overworld)

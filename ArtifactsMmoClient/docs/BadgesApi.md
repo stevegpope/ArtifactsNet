@@ -9,7 +9,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getallbadgesbadgesget"></a>
 # **GetAllBadgesBadgesGet**
-> DataPageBadgeSchema GetAllBadgesBadgesGet (int? page = null, int? size = null)
+> StaticDataPageBadgeSchema GetAllBadgesBadgesGet (int? page = null, int? size = null)
 
 Get All Badges
 
@@ -42,7 +42,7 @@ namespace Example
             try
             {
                 // Get All Badges
-                DataPageBadgeSchema result = apiInstance.GetAllBadgesBadgesGet(page, size);
+                StaticDataPageBadgeSchema result = apiInstance.GetAllBadgesBadgesGet(page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -63,7 +63,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Badges
-    ApiResponse<DataPageBadgeSchema> response = apiInstance.GetAllBadgesBadgesGetWithHttpInfo(page, size);
+    ApiResponse<StaticDataPageBadgeSchema> response = apiInstance.GetAllBadgesBadgesGetWithHttpInfo(page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -85,7 +85,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageBadgeSchema**](DataPageBadgeSchema.md)
+[**StaticDataPageBadgeSchema**](StaticDataPageBadgeSchema.md)
 
 ### Authorization
 

@@ -78,6 +78,7 @@ namespace Artifacts
                     }
 
                     await MakeJewels();
+                    await NpcTrades();
 
                     if (_random.Next(10) <= 1)
                     {
@@ -140,6 +141,75 @@ namespace Artifacts
                 catch (Exception ex)
                 {
                     File.AppendAllText("errors.txt", $"[{DateTime.UtcNow}] {ex}\n");
+                }
+            }
+        }
+
+        private async Task NpcTrades()
+        {
+            var npcs = Npcs.GetAllNpcs();
+            var bankItems = await Bank.Instance.GetItems();
+            var characters = await _character.GetAllCharacters();
+
+            foreach (var npc in npcs.Values)
+            {
+                foreach(var item in npc.Items)
+                {
+                    if (item.Currency == "gold" || item.Currency == "tasks_coin")
+                    {
+                        continue;
+                    }
+
+                    if (item.BuyPrice == null || item.BuyPrice.Value <= 0)
+                    {
+                        // We are buying, not selling
+                        continue; 
+                    }
+
+                    var bankItem = bankItems.FirstOrDefault(x => x.Code == item.Currency);
+                    if (bankItem != null && bankItem.Quantity >= item.BuyPrice)
+                    {
+                        var purchaseQuantity = bankItem.Quantity / item.BuyPrice.Value;
+
+                        var itemDef = Items.GetItem(item.Code);
+                        if (itemDef.Effects != null && itemDef.Effects.Count > 0)
+                        {
+                            var currentAmount = CountAmountEverywhere(item.Code, characters, bankItems);
+                            var limit = itemDef.Type == "ring" ? 10 : 5;
+                            purchaseQuantity = Math.Min(purchaseQuantity, limit - currentAmount);
+                        }
+
+                        Console.WriteLine($"We can buy {purchaseQuantity} {item.Code} from {npc.Code} with our {bankItem.Quantity} {item.Currency}");
+
+                        while (purchaseQuantity > 0)
+                        {
+                            var inventorySpace = _character.GetFreeInventorySpace();
+                            var amount = inventorySpace / item.BuyPrice.Value;
+
+                            var batch = Math.Min(purchaseQuantity, amount);
+                            batch = Math.Min(batch, 25);
+                            Console.WriteLine($"Buying {batch} {item.Code} from {npc.Code} for {batch * item.BuyPrice} {item.Currency}");
+                            await _character.MoveTo(MapContentType.Bank);
+                            var withdrawn = await _character.WithdrawItems(item.Currency, batch * item.BuyPrice.Value);
+                            if (withdrawn < batch * item.BuyPrice.Value)
+                            {
+                                Console.WriteLine($"Couldn't withdraw enough {item.Currency} to buy {batch} {item.Code}, we got {withdrawn} but needed {batch * item.BuyPrice.Value}");
+                                break;
+                            }
+
+                            await _character.MoveTo(MapContentType.Npc, npc.Code);
+                            var bought = await _character.BuyNpcItem(item.Code, batch);
+                            if (bought == 0)
+                            {
+                                Console.WriteLine($"Couldn't buy any {item.Code} from {npc.Code}, even though we had enough {item.Currency}");
+                                break;
+                            }
+
+                            await _character.MoveTo(MapContentType.Bank);
+                            await _character.DepositAllItems();
+                            purchaseQuantity -= batch;
+                        }
+                    }
                 }
             }
         }
@@ -349,7 +419,7 @@ namespace Artifacts
         private async Task ProcessMonsterEvent(ActiveEventSchema activeEvent)
         {
             Console.WriteLine($"{activeEvent.Code} is present, trying to kill stuff");
-            var monster = await Monsters.GetMonster(activeEvent.Map.Interactions.Content.Code);
+            var monster = Monsters.GetMonster(activeEvent.Map.Interactions.Content.Code);
             if (monster == null)
             {
                 Console.WriteLine($"No monsters here");
@@ -369,7 +439,7 @@ namespace Artifacts
         {
             Console.WriteLine($"{activeEvent.Code} is present, trying to sell stuff");
 
-            var items = await Npcs.Instance.GetNpcItems(activeEvent.Code);
+            var items = Npcs.Instance.GetNpcItems(activeEvent.Code);
             var bankItems = await Bank.Instance.GetItems();
             foreach (var item in items)
             {

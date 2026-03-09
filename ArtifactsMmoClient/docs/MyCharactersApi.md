@@ -2715,6 +2715,7 @@ catch (ApiException e)
 | **498** | Character not found. |  -  |
 | **499** | The character is in cooldown. |  -  |
 | **486** | An action is already in progress for this character. |  -  |
+| **487** | The character has no task assigned. |  -  |
 | **598** | Tasks Master not found on this map. |  -  |
 | **478** | Missing required item(s). |  -  |
 | **422** | Request could not be processed due to an invalid payload. |  -  |

@@ -9,7 +9,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getallresourcesresourcesget"></a>
 # **GetAllResourcesResourcesGet**
-> DataPageResourceSchema GetAllResourcesResourcesGet (int? minLevel = null, int? maxLevel = null, GatheringSkill? skill = null, string? drop = null, int? page = null, int? size = null)
+> StaticDataPageResourceSchema GetAllResourcesResourcesGet (int? minLevel = null, int? maxLevel = null, GatheringSkill? skill = null, string? drop = null, int? page = null, int? size = null)
 
 Get All Resources
 
@@ -46,7 +46,7 @@ namespace Example
             try
             {
                 // Get All Resources
-                DataPageResourceSchema result = apiInstance.GetAllResourcesResourcesGet(minLevel, maxLevel, skill, drop, page, size);
+                StaticDataPageResourceSchema result = apiInstance.GetAllResourcesResourcesGet(minLevel, maxLevel, skill, drop, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -67,7 +67,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Resources
-    ApiResponse<DataPageResourceSchema> response = apiInstance.GetAllResourcesResourcesGetWithHttpInfo(minLevel, maxLevel, skill, drop, page, size);
+    ApiResponse<StaticDataPageResourceSchema> response = apiInstance.GetAllResourcesResourcesGetWithHttpInfo(minLevel, maxLevel, skill, drop, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -93,7 +93,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageResourceSchema**](DataPageResourceSchema.md)
+[**StaticDataPageResourceSchema**](StaticDataPageResourceSchema.md)
 
 ### Authorization
 

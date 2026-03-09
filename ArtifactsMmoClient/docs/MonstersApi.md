@@ -9,7 +9,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getallmonstersmonstersget"></a>
 # **GetAllMonstersMonstersGet**
-> DataPageMonsterSchema GetAllMonstersMonstersGet (string? name = null, int? minLevel = null, int? maxLevel = null, string? drop = null, int? page = null, int? size = null)
+> StaticDataPageMonsterSchema GetAllMonstersMonstersGet (string? name = null, int? minLevel = null, int? maxLevel = null, string? drop = null, int? page = null, int? size = null)
 
 Get All Monsters
 
@@ -46,7 +46,7 @@ namespace Example
             try
             {
                 // Get All Monsters
-                DataPageMonsterSchema result = apiInstance.GetAllMonstersMonstersGet(name, minLevel, maxLevel, drop, page, size);
+                StaticDataPageMonsterSchema result = apiInstance.GetAllMonstersMonstersGet(name, minLevel, maxLevel, drop, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -67,7 +67,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Monsters
-    ApiResponse<DataPageMonsterSchema> response = apiInstance.GetAllMonstersMonstersGetWithHttpInfo(name, minLevel, maxLevel, drop, page, size);
+    ApiResponse<StaticDataPageMonsterSchema> response = apiInstance.GetAllMonstersMonstersGetWithHttpInfo(name, minLevel, maxLevel, drop, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -93,7 +93,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageMonsterSchema**](DataPageMonsterSchema.md)
+[**StaticDataPageMonsterSchema**](StaticDataPageMonsterSchema.md)
 
 ### Authorization
 

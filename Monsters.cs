@@ -51,13 +51,17 @@ namespace Artifacts
             return _cache;
         }
 
-        internal DataPageMonsterSchema GetMonsters(int maxLevel, string dropCode = null)
+        internal List<MonsterSchema> GetMonsters(int maxLevel, string dropCode = null)
         {
-            var monsters = _api.GetAllMonstersMonstersGet(maxLevel: maxLevel, drop: dropCode);
-            return monsters;
+            var monstersMatchingLevel = _cache.Values.Where(m => m.Level <= maxLevel);
+            var monstersMatchingDrop = dropCode != null
+                ? monstersMatchingLevel.Where(m => m.Drops.Any(d => d.Code == dropCode))
+                : monstersMatchingLevel;
+
+            return monstersMatchingDrop.ToList();
         }
 
-        internal static async Task<MonsterSchema> GetMonster(string monsterCode)
+        internal static MonsterSchema GetMonster(string monsterCode)
         {
             if (_cache.TryGetValue(monsterCode, out var monster))
             {

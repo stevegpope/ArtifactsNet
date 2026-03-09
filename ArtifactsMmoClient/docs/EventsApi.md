@@ -10,7 +10,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getallactiveeventseventsactiveget"></a>
 # **GetAllActiveEventsEventsActiveGet**
-> DataPageActiveEventSchema GetAllActiveEventsEventsActiveGet (int? page = null, int? size = null)
+> StaticDataPageActiveEventSchema GetAllActiveEventsEventsActiveGet (int? page = null, int? size = null)
 
 Get All Active Events
 
@@ -43,7 +43,7 @@ namespace Example
             try
             {
                 // Get All Active Events
-                DataPageActiveEventSchema result = apiInstance.GetAllActiveEventsEventsActiveGet(page, size);
+                StaticDataPageActiveEventSchema result = apiInstance.GetAllActiveEventsEventsActiveGet(page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -64,7 +64,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Active Events
-    ApiResponse<DataPageActiveEventSchema> response = apiInstance.GetAllActiveEventsEventsActiveGetWithHttpInfo(page, size);
+    ApiResponse<StaticDataPageActiveEventSchema> response = apiInstance.GetAllActiveEventsEventsActiveGetWithHttpInfo(page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -86,7 +86,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageActiveEventSchema**](DataPageActiveEventSchema.md)
+[**StaticDataPageActiveEventSchema**](StaticDataPageActiveEventSchema.md)
 
 ### Authorization
 
@@ -107,7 +107,7 @@ No authorization required
 
 <a id="getalleventseventsget"></a>
 # **GetAllEventsEventsGet**
-> DataPageEventSchema GetAllEventsEventsGet (MapContentType? type = null, int? page = null, int? size = null)
+> StaticDataPageEventSchema GetAllEventsEventsGet (MapContentType? type = null, int? page = null, int? size = null)
 
 Get All Events
 
@@ -141,7 +141,7 @@ namespace Example
             try
             {
                 // Get All Events
-                DataPageEventSchema result = apiInstance.GetAllEventsEventsGet(type, page, size);
+                StaticDataPageEventSchema result = apiInstance.GetAllEventsEventsGet(type, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -162,7 +162,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Events
-    ApiResponse<DataPageEventSchema> response = apiInstance.GetAllEventsEventsGetWithHttpInfo(type, page, size);
+    ApiResponse<StaticDataPageEventSchema> response = apiInstance.GetAllEventsEventsGetWithHttpInfo(type, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -185,7 +185,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageEventSchema**](DataPageEventSchema.md)
+[**StaticDataPageEventSchema**](StaticDataPageEventSchema.md)
 
 ### Authorization
 
@@ -300,7 +300,8 @@ catch (ApiException e)
 |-------------|-------------|------------------|
 | **200** | Successfully fetched data. |  -  |
 | **563** | Insufficient event tokens. You need at least 1 event token to spawn an event. |  -  |
-| **564** | Event not found or already active. |  -  |
+| **404** | Event not found. |  -  |
+| **564** | Event already active or maximum active events reached. |  -  |
 | **422** | Request could not be processed due to an invalid payload. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

@@ -11,7 +11,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getallnpcsitemsnpcsitemsget"></a>
 # **GetAllNpcsItemsNpcsItemsGet**
-> DataPageNPCItem GetAllNpcsItemsNpcsItemsGet (string? code = null, string? npc = null, string? currency = null, int? page = null, int? size = null)
+> StaticDataPageNPCItem GetAllNpcsItemsNpcsItemsGet (string? code = null, string? npc = null, string? currency = null, int? page = null, int? size = null)
 
 Get All Npcs Items
 
@@ -47,7 +47,7 @@ namespace Example
             try
             {
                 // Get All Npcs Items
-                DataPageNPCItem result = apiInstance.GetAllNpcsItemsNpcsItemsGet(code, npc, currency, page, size);
+                StaticDataPageNPCItem result = apiInstance.GetAllNpcsItemsNpcsItemsGet(code, npc, currency, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -68,7 +68,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Npcs Items
-    ApiResponse<DataPageNPCItem> response = apiInstance.GetAllNpcsItemsNpcsItemsGetWithHttpInfo(code, npc, currency, page, size);
+    ApiResponse<StaticDataPageNPCItem> response = apiInstance.GetAllNpcsItemsNpcsItemsGetWithHttpInfo(code, npc, currency, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -93,7 +93,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageNPCItem**](DataPageNPCItem.md)
+[**StaticDataPageNPCItem**](StaticDataPageNPCItem.md)
 
 ### Authorization
 
@@ -114,7 +114,7 @@ No authorization required
 
 <a id="getallnpcsnpcsdetailsget"></a>
 # **GetAllNpcsNpcsDetailsGet**
-> DataPageNPCSchema GetAllNpcsNpcsDetailsGet (string? name = null, NPCType? type = null, int? page = null, int? size = null)
+> StaticDataPageNPCSchema GetAllNpcsNpcsDetailsGet (string? name = null, NPCType? type = null, string? currency = null, string? item = null, int? page = null, int? size = null)
 
 Get All Npcs
 
@@ -143,13 +143,15 @@ namespace Example
             var apiInstance = new NPCsApi(httpClient, config, httpClientHandler);
             var name = "name_example";  // string? | NPC name. (optional) 
             var type = new NPCType?(); // NPCType? | Type of NPCs. (optional) 
+            var currency = "currency_example";  // string? | Currency code to filter NPCs that trade with this currency. (optional) 
+            var item = "item_example";  // string? | Item code to filter NPCs that trade this item. (optional) 
             var page = 1;  // int? | Page number (optional)  (default to 1)
             var size = 50;  // int? | Page size (optional)  (default to 50)
 
             try
             {
                 // Get All Npcs
-                DataPageNPCSchema result = apiInstance.GetAllNpcsNpcsDetailsGet(name, type, page, size);
+                StaticDataPageNPCSchema result = apiInstance.GetAllNpcsNpcsDetailsGet(name, type, currency, item, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -170,7 +172,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Npcs
-    ApiResponse<DataPageNPCSchema> response = apiInstance.GetAllNpcsNpcsDetailsGetWithHttpInfo(name, type, page, size);
+    ApiResponse<StaticDataPageNPCSchema> response = apiInstance.GetAllNpcsNpcsDetailsGetWithHttpInfo(name, type, currency, item, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -189,12 +191,14 @@ catch (ApiException e)
 |------|------|-------------|-------|
 | **name** | **string?** | NPC name. | [optional]  |
 | **type** | [**NPCType?**](NPCType?.md) | Type of NPCs. | [optional]  |
+| **currency** | **string?** | Currency code to filter NPCs that trade with this currency. | [optional]  |
+| **item** | **string?** | Item code to filter NPCs that trade this item. | [optional]  |
 | **page** | **int?** | Page number | [optional] [default to 1] |
 | **size** | **int?** | Page size | [optional] [default to 50] |
 
 ### Return type
 
-[**DataPageNPCSchema**](DataPageNPCSchema.md)
+[**StaticDataPageNPCSchema**](StaticDataPageNPCSchema.md)
 
 ### Authorization
 
@@ -215,7 +219,7 @@ No authorization required
 
 <a id="getnpcitemsnpcsitemscodeget"></a>
 # **GetNpcItemsNpcsItemsCodeGet**
-> DataPageNPCItem GetNpcItemsNpcsItemsCodeGet (string code, int? page = null, int? size = null)
+> StaticDataPageNPCItem GetNpcItemsNpcsItemsCodeGet (string code, int? page = null, int? size = null)
 
 Get Npc Items
 
@@ -249,7 +253,7 @@ namespace Example
             try
             {
                 // Get Npc Items
-                DataPageNPCItem result = apiInstance.GetNpcItemsNpcsItemsCodeGet(code, page, size);
+                StaticDataPageNPCItem result = apiInstance.GetNpcItemsNpcsItemsCodeGet(code, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -270,7 +274,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get Npc Items
-    ApiResponse<DataPageNPCItem> response = apiInstance.GetNpcItemsNpcsItemsCodeGetWithHttpInfo(code, page, size);
+    ApiResponse<StaticDataPageNPCItem> response = apiInstance.GetNpcItemsNpcsItemsCodeGetWithHttpInfo(code, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -293,7 +297,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageNPCItem**](DataPageNPCItem.md)
+[**StaticDataPageNPCItem**](StaticDataPageNPCItem.md)
 
 ### Authorization
 

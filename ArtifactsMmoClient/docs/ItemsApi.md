@@ -9,7 +9,7 @@ All URIs are relative to *http://localhost*
 
 <a id="getallitemsitemsget"></a>
 # **GetAllItemsItemsGet**
-> DataPageItemSchema GetAllItemsItemsGet (string? name = null, int? minLevel = null, int? maxLevel = null, ItemType? type = null, CraftSkill? craftSkill = null, string? craftMaterial = null, int? page = null, int? size = null)
+> StaticDataPageItemSchema GetAllItemsItemsGet (string? name = null, int? minLevel = null, int? maxLevel = null, ItemType? type = null, CraftSkill? craftSkill = null, string? craftMaterial = null, int? page = null, int? size = null)
 
 Get All Items
 
@@ -48,7 +48,7 @@ namespace Example
             try
             {
                 // Get All Items
-                DataPageItemSchema result = apiInstance.GetAllItemsItemsGet(name, minLevel, maxLevel, type, craftSkill, craftMaterial, page, size);
+                StaticDataPageItemSchema result = apiInstance.GetAllItemsItemsGet(name, minLevel, maxLevel, type, craftSkill, craftMaterial, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -69,7 +69,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Items
-    ApiResponse<DataPageItemSchema> response = apiInstance.GetAllItemsItemsGetWithHttpInfo(name, minLevel, maxLevel, type, craftSkill, craftMaterial, page, size);
+    ApiResponse<StaticDataPageItemSchema> response = apiInstance.GetAllItemsItemsGetWithHttpInfo(name, minLevel, maxLevel, type, craftSkill, craftMaterial, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -97,7 +97,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageItemSchema**](DataPageItemSchema.md)
+[**StaticDataPageItemSchema**](StaticDataPageItemSchema.md)
 
 ### Authorization
 

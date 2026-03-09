@@ -9,7 +9,7 @@ info:
 
     OpenAPI Spec: https://api.artifactsmmo.com/openapi.json
   title: Artifacts API
-  version: 7.0.0
+  version: 7.0.3
 servers:
 - url: /
 paths:
@@ -3533,6 +3533,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
           description: An action is already in progress for this character.
+        "487":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 487
+                  message: The character has no task assigned.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: The character has no task assigned.
         "598":
           content:
             application/json:
@@ -4514,7 +4524,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -4524,7 +4534,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_AchievementSchema_"
+                $ref: "#/components/schemas/StaticDataPage_AchievementSchema_"
           description: Successfully fetched achievements.
       summary: Get All Achievements
       tags:
@@ -4590,7 +4600,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -4600,7 +4610,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_BadgeSchema_"
+                $ref: "#/components/schemas/StaticDataPage_BadgeSchema_"
           description: Successfully fetched badges.
       summary: Get All Badges
       tags:
@@ -4855,7 +4865,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -4865,7 +4875,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_EffectSchema_"
+                $ref: "#/components/schemas/StaticDataPage_EffectSchema_"
           description: Successfully fetched effects.
       summary: Get All Effects
       tags:
@@ -4931,7 +4941,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -4941,7 +4951,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_ActiveEventSchema_"
+                $ref: "#/components/schemas/StaticDataPage_ActiveEventSchema_"
           description: Successfully fetched active events.
       summary: Get All Active Events
       tags:
@@ -4982,7 +4992,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -4992,7 +5002,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_EventSchema_"
+                $ref: "#/components/schemas/StaticDataPage_EventSchema_"
           description: Successfully fetched events.
       summary: Get All Events
       tags:
@@ -5027,16 +5037,26 @@ paths:
                 $ref: "#/components/schemas/ErrorResponseSchema"
           description: Insufficient event tokens. You need at least 1 event token
             to spawn an event.
+        "404":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 404
+                  message: Event not found.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Event not found.
         "564":
           content:
             application/json:
               example:
                 error:
                   code: 564
-                  message: Event not found or already active.
+                  message: Event already active or maximum active events reached.
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
-          description: Event not found or already active.
+          description: Event already active or maximum active events reached.
         "422":
           content:
             application/json:
@@ -5334,7 +5354,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -5344,7 +5364,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_ItemSchema_"
+                $ref: "#/components/schemas/StaticDataPage_ItemSchema_"
           description: Successfully fetched items.
       summary: Get All Items
       tags:
@@ -5580,7 +5600,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -5590,7 +5610,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_MapSchema_"
+                $ref: "#/components/schemas/StaticDataPage_MapSchema_"
           description: Successfully fetched maps.
       summary: Get All Maps
       tags:
@@ -5666,7 +5686,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -5676,7 +5696,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_MapSchema_"
+                $ref: "#/components/schemas/StaticDataPage_MapSchema_"
           description: Successfully fetched maps.
       summary: Get Layer Maps
       tags:
@@ -5841,7 +5861,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -5851,7 +5871,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_MonsterSchema_"
+                $ref: "#/components/schemas/StaticDataPage_MonsterSchema_"
           description: Successfully fetched monsters.
       summary: Get All Monsters
       tags:
@@ -5919,6 +5939,28 @@ paths:
           description: Type of NPCs.
           title: Type
         style: form
+      - description: Currency code to filter NPCs that trade with this currency.
+        explode: true
+        in: query
+        name: currency
+        required: false
+        schema:
+          description: Currency code to filter NPCs that trade with this currency.
+          pattern: "^[a-zA-Z0-9_-]+$"
+          title: Currency code
+          type: string
+        style: form
+      - description: Item code to filter NPCs that trade this item.
+        explode: true
+        in: query
+        name: item
+        required: false
+        schema:
+          description: Item code to filter NPCs that trade this item.
+          pattern: "^[a-zA-Z0-9_-]+$"
+          title: Item code
+          type: string
+        style: form
       - description: Page number
         explode: true
         in: query
@@ -5939,7 +5981,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -5949,7 +5991,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_NPCSchema_"
+                $ref: "#/components/schemas/StaticDataPage_NPCSchema_"
           description: Successfully fetched NPCs.
       summary: Get All Npcs
       tags:
@@ -6027,7 +6069,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -6037,7 +6079,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_NPCItem_"
+                $ref: "#/components/schemas/StaticDataPage_NPCItem_"
           description: Successfully fetched NPC items.
         "404":
           content:
@@ -6110,7 +6152,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -6120,7 +6162,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_NPCItem_"
+                $ref: "#/components/schemas/StaticDataPage_NPCItem_"
           description: Successfully fetched NPC items.
       summary: Get All Npcs Items
       tags:
@@ -6194,7 +6236,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -6204,7 +6246,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_ResourceSchema_"
+                $ref: "#/components/schemas/StaticDataPage_ResourceSchema_"
           description: Successfully fetched resources.
       summary: Get All Resources
       tags:
@@ -6314,7 +6356,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -6324,7 +6366,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_TaskFullSchema_"
+                $ref: "#/components/schemas/StaticDataPage_TaskFullSchema_"
           description: Successfully fetched tasks.
       summary: Get All Tasks
       tags:
@@ -6391,7 +6433,7 @@ paths:
         schema:
           default: 50
           description: Page size
-          maximum: 100
+          maximum: 10000
           minimum: 1
           title: Size
           type: integer
@@ -6401,7 +6443,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataPage_DropRateSchema_"
+                $ref: "#/components/schemas/StaticDataPage_DropRateSchema_"
           description: Successfully fetched tasks rewards.
       summary: Get All Tasks Rewards
       tags:
@@ -6467,10 +6509,30 @@ paths:
               example:
                 error:
                   code: 404
-                  message: Monster not found.
+                  message: Monster or item not found.
               schema:
                 $ref: "#/components/schemas/ErrorResponseSchema"
-          description: Monster not found.
+          description: Monster or item not found.
+        "486":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 486
+                  message: Only boss monsters can be fought by multiple characters.
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: Only boss monsters can be fought by multiple characters.
+        "451":
+          content:
+            application/json:
+              example:
+                error:
+                  code: 451
+                  message: "Access denied, you must be a member to do that."
+              schema:
+                $ref: "#/components/schemas/ErrorResponseSchema"
+          description: "Access denied, you must be a member to do that."
         "422":
           content:
             application/json:
@@ -6924,6 +6986,9 @@ components:
       - rename
       - transition
       - claim_item
+      - sandbox_give_gold
+      - sandbox_give_item
+      - sandbox_give_xp
       title: ActionType
       type: string
     ActiveCharacterSchema:
@@ -9443,66 +9508,6 @@ components:
       required:
       - data
       title: "DataPage[AccountLeaderboardSchema]"
-    DataPage_AchievementSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - code: code
-          name: name
-          description: description
-          objectives:
-          - total: 6
-            type: ""
-            target: target
-          - total: 6
-            type: ""
-            target: target
-          rewards: ""
-          points: 0
-        - code: code
-          name: name
-          description: description
-          objectives:
-          - total: 6
-            type: ""
-            target: target
-          - total: 6
-            type: ""
-            target: target
-          rewards: ""
-          points: 0
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/AchievementSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[AchievementSchema]"
     DataPage_ActiveCharacterSchema_:
       example:
         total: 0
@@ -9553,108 +9558,6 @@ components:
       required:
       - data
       title: "DataPage[ActiveCharacterSchema]"
-    DataPage_ActiveEventSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - duration: 0
-          code: code
-          name: name
-          previous_map: ""
-          created_at: 2000-01-23T04:56:07.000+00:00
-          expiration: 2000-01-23T04:56:07.000+00:00
-          map: ""
-        - duration: 0
-          code: code
-          name: name
-          previous_map: ""
-          created_at: 2000-01-23T04:56:07.000+00:00
-          expiration: 2000-01-23T04:56:07.000+00:00
-          map: ""
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/ActiveEventSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[ActiveEventSchema]"
-    DataPage_BadgeSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - code: code
-          season: 0
-          description: description
-          conditions:
-          - code: code
-            quantity: 6
-          - code: code
-            quantity: 6
-        - code: code
-          season: 0
-          description: description
-          conditions:
-          - code: code
-            quantity: 6
-          - code: code
-            quantity: 6
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/BadgeSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[BadgeSchema]"
     DataPage_CharacterLeaderboardSchema_:
       example:
         total: 0
@@ -9739,164 +9642,6 @@ components:
       required:
       - data
       title: "DataPage[CharacterLeaderboardSchema]"
-    DataPage_DropRateSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - code: code
-          max_quantity: 1
-          min_quantity: 1
-          rate: 1
-        - code: code
-          max_quantity: 1
-          min_quantity: 1
-          rate: 1
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/DropRateSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[DropRateSchema]"
-    DataPage_EffectSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - code: code
-          subtype: ""
-          name: name
-          description: description
-          type: ""
-        - code: code
-          subtype: ""
-          name: name
-          description: description
-          type: ""
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/EffectSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[EffectSchema]"
-    DataPage_EventSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - duration: 5
-          code: code
-          maps:
-          - map_id: 0
-            x: 6
-            skin: skin
-            "y": 1
-            layer: layer
-          - map_id: 0
-            x: 6
-            skin: skin
-            "y": 1
-            layer: layer
-          rate: 5
-          name: name
-          content: ""
-        - duration: 5
-          code: code
-          maps:
-          - map_id: 0
-            x: 6
-            skin: skin
-            "y": 1
-            layer: layer
-          - map_id: 0
-            x: 6
-            skin: skin
-            "y": 1
-            layer: layer
-          rate: 5
-          name: name
-          content: ""
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/EventSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[EventSchema]"
     DataPage_GEOrderSchema_:
       example:
         total: 0
@@ -9997,86 +9742,6 @@ components:
       required:
       - data
       title: "DataPage[GeOrderHistorySchema]"
-    DataPage_ItemSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - effects:
-          - code: code
-            description: description
-            value: 1
-          - code: code
-            description: description
-            value: 1
-          code: code
-          level: 1
-          subtype: subtype
-          name: name
-          craft: ""
-          tradeable: true
-          description: description
-          type: type
-          conditions:
-          - code: code
-            value: 6
-            operator: ""
-          - code: code
-            value: 6
-            operator: ""
-        - effects:
-          - code: code
-            description: description
-            value: 1
-          - code: code
-            description: description
-            value: 1
-          code: code
-          level: 1
-          subtype: subtype
-          name: name
-          craft: ""
-          tradeable: true
-          description: description
-          type: type
-          conditions:
-          - code: code
-            value: 6
-            operator: ""
-          - code: code
-            value: 6
-            operator: ""
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/ItemSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[ItemSchema]"
     DataPage_LogSchema_:
       example:
         total: 0
@@ -10129,250 +9794,6 @@ components:
       required:
       - data
       title: "DataPage[LogSchema]"
-    DataPage_MapSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - access: ""
-          map_id: 0
-          name: name
-          skin: skin
-          x: 6
-          "y": 1
-          layer: ""
-          interactions: ""
-        - access: ""
-          map_id: 0
-          name: name
-          skin: skin
-          x: 6
-          "y": 1
-          layer: ""
-          interactions: ""
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/MapSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[MapSchema]"
-    DataPage_MonsterSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - attack_fire: 1
-          code: code
-          initiative: 7
-          min_gold: 1
-          level: 0
-          hp: 6
-          attack_air: 2
-          res_air: 2
-          res_water: 3
-          type: ""
-          attack_water: 5
-          critical_strike: 4
-          effects:
-          - code: code
-            description: description
-            value: 1
-          - code: code
-            description: description
-            value: 1
-          drops:
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          res_fire: 7
-          max_gold: 1
-          name: name
-          attack_earth: 5
-          res_earth: 9
-        - attack_fire: 1
-          code: code
-          initiative: 7
-          min_gold: 1
-          level: 0
-          hp: 6
-          attack_air: 2
-          res_air: 2
-          res_water: 3
-          type: ""
-          attack_water: 5
-          critical_strike: 4
-          effects:
-          - code: code
-            description: description
-            value: 1
-          - code: code
-            description: description
-            value: 1
-          drops:
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          res_fire: 7
-          max_gold: 1
-          name: name
-          attack_earth: 5
-          res_earth: 9
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/MonsterSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[MonsterSchema]"
-    DataPage_NPCItem_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - npc: npc
-          code: code
-          sell_price: 6
-          currency: currency
-          buy_price: 0
-        - npc: npc
-          code: code
-          sell_price: 6
-          currency: currency
-          buy_price: 0
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/NPCItem"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[NPCItem]"
-    DataPage_NPCSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - code: code
-          name: name
-          description: description
-          type: ""
-        - code: code
-          name: name
-          description: description
-          type: ""
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/NPCSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[NPCSchema]"
     DataPage_PendingItemSchema_:
       example:
         total: 0
@@ -10435,68 +9856,6 @@ components:
       required:
       - data
       title: "DataPage[PendingItemSchema]"
-    DataPage_ResourceSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - drops:
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          code: code
-          level: 0
-          skill: ""
-          name: name
-        - drops:
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          - code: code
-            max_quantity: 1
-            min_quantity: 1
-            rate: 1
-          code: code
-          level: 0
-          skill: ""
-          name: name
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/ResourceSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[ResourceSchema]"
     DataPage_SimpleItemSchema_:
       example:
         total: 0
@@ -10537,56 +9896,6 @@ components:
       required:
       - data
       title: "DataPage[SimpleItemSchema]"
-    DataPage_TaskFullSchema_:
-      example:
-        total: 0
-        pages: 0
-        data:
-        - code: code
-          max_quantity: 1
-          min_quantity: 6
-          level: 0
-          skill: skill
-          type: ""
-          rewards: ""
-        - code: code
-          max_quantity: 1
-          min_quantity: 6
-          level: 0
-          skill: skill
-          type: ""
-          rewards: ""
-        size: 1
-        page: 1
-      properties:
-        data:
-          items:
-            $ref: "#/components/schemas/TaskFullSchema"
-          title: Data
-          type: array
-        total:
-          minimum: 0.0
-          title: Total
-          type: integer
-          nullable: true
-        page:
-          minimum: 1.0
-          title: Page
-          type: integer
-          nullable: true
-        size:
-          minimum: 1.0
-          title: Size
-          type: integer
-          nullable: true
-        pages:
-          minimum: 0.0
-          title: Pages
-          type: integer
-          nullable: true
-      required:
-      - data
-      title: "DataPage[TaskFullSchema]"
     DeleteCharacterSchema:
       example:
         name: name
@@ -11887,6 +11196,7 @@ components:
     LogType:
       enum:
       - spawn
+      - delete_character
       - movement
       - fight
       - multi_fight
@@ -11924,6 +11234,10 @@ components:
       - rename
       - transition
       - claim_item
+      - sandbox_give_gold
+      - sandbox_give_item
+      - sandbox_give_xp
+      - sandbox_reset_account
       title: LogType
       type: string
     MapAccessType:
@@ -12577,6 +11891,15 @@ components:
           name: name
           description: description
           type: ""
+          items:
+          - code: code
+            sell_price: 6
+            currency: currency
+            buy_price: 0
+          - code: code
+            sell_price: 6
+            currency: currency
+            buy_price: 0
       properties:
         data:
           $ref: "#/components/schemas/NPCSchema"
@@ -12589,6 +11912,15 @@ components:
         name: name
         description: description
         type: ""
+        items:
+        - code: code
+          sell_price: 6
+          currency: currency
+          buy_price: 0
+        - code: code
+          sell_price: 6
+          currency: currency
+          buy_price: 0
       properties:
         name:
           description: Name of the NPC.
@@ -12606,6 +11938,13 @@ components:
           allOf:
           - $ref: "#/components/schemas/NPCType"
           description: Type of the NPC.
+        items:
+          default: []
+          description: Items sold/bought by the NPC.
+          items:
+            $ref: "#/components/schemas/SimpleNPCItem"
+          title: Items
+          type: array
       required:
       - code
       - description
@@ -13174,6 +12513,36 @@ components:
       - code
       - quantity
       title: SimpleItemSchema
+    SimpleNPCItem:
+      example:
+        code: code
+        sell_price: 6
+        currency: currency
+        buy_price: 0
+      properties:
+        code:
+          description: Item code.
+          title: Code
+          type: string
+        currency:
+          description: "Currency used to buy/sell the item. If it's not gold, it's\
+            \ the item code."
+          title: Currency
+          type: string
+        buy_price:
+          description: Price to buy the item.
+          title: Buy Price
+          type: integer
+          nullable: true
+        sell_price:
+          description: Price to sell the item.
+          title: Sell Price
+          type: integer
+          nullable: true
+      required:
+      - code
+      - currency
+      title: SimpleNPCItem
     Skill:
       enum:
       - weaponcrafting
@@ -13249,6 +12618,780 @@ components:
       required:
       - code
       title: SpawnEventRequest
+    StaticDataPage_AchievementSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - code: code
+          name: name
+          description: description
+          objectives:
+          - total: 6
+            type: ""
+            target: target
+          - total: 6
+            type: ""
+            target: target
+          rewards: ""
+          points: 0
+        - code: code
+          name: name
+          description: description
+          objectives:
+          - total: 6
+            type: ""
+            target: target
+          - total: 6
+            type: ""
+            target: target
+          rewards: ""
+          points: 0
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/AchievementSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[AchievementSchema]"
+    StaticDataPage_ActiveEventSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - duration: 0
+          code: code
+          name: name
+          previous_map: ""
+          created_at: 2000-01-23T04:56:07.000+00:00
+          expiration: 2000-01-23T04:56:07.000+00:00
+          map: ""
+        - duration: 0
+          code: code
+          name: name
+          previous_map: ""
+          created_at: 2000-01-23T04:56:07.000+00:00
+          expiration: 2000-01-23T04:56:07.000+00:00
+          map: ""
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/ActiveEventSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[ActiveEventSchema]"
+    StaticDataPage_BadgeSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - code: code
+          season: 0
+          description: description
+          conditions:
+          - code: code
+            quantity: 6
+          - code: code
+            quantity: 6
+        - code: code
+          season: 0
+          description: description
+          conditions:
+          - code: code
+            quantity: 6
+          - code: code
+            quantity: 6
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/BadgeSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[BadgeSchema]"
+    StaticDataPage_DropRateSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - code: code
+          max_quantity: 1
+          min_quantity: 1
+          rate: 1
+        - code: code
+          max_quantity: 1
+          min_quantity: 1
+          rate: 1
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/DropRateSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[DropRateSchema]"
+    StaticDataPage_EffectSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - code: code
+          subtype: ""
+          name: name
+          description: description
+          type: ""
+        - code: code
+          subtype: ""
+          name: name
+          description: description
+          type: ""
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/EffectSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[EffectSchema]"
+    StaticDataPage_EventSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - duration: 5
+          code: code
+          maps:
+          - map_id: 0
+            x: 6
+            skin: skin
+            "y": 1
+            layer: layer
+          - map_id: 0
+            x: 6
+            skin: skin
+            "y": 1
+            layer: layer
+          rate: 5
+          name: name
+          content: ""
+        - duration: 5
+          code: code
+          maps:
+          - map_id: 0
+            x: 6
+            skin: skin
+            "y": 1
+            layer: layer
+          - map_id: 0
+            x: 6
+            skin: skin
+            "y": 1
+            layer: layer
+          rate: 5
+          name: name
+          content: ""
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/EventSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[EventSchema]"
+    StaticDataPage_ItemSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - effects:
+          - code: code
+            description: description
+            value: 1
+          - code: code
+            description: description
+            value: 1
+          code: code
+          level: 1
+          subtype: subtype
+          name: name
+          craft: ""
+          tradeable: true
+          description: description
+          type: type
+          conditions:
+          - code: code
+            value: 6
+            operator: ""
+          - code: code
+            value: 6
+            operator: ""
+        - effects:
+          - code: code
+            description: description
+            value: 1
+          - code: code
+            description: description
+            value: 1
+          code: code
+          level: 1
+          subtype: subtype
+          name: name
+          craft: ""
+          tradeable: true
+          description: description
+          type: type
+          conditions:
+          - code: code
+            value: 6
+            operator: ""
+          - code: code
+            value: 6
+            operator: ""
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/ItemSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[ItemSchema]"
+    StaticDataPage_MapSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - access: ""
+          map_id: 0
+          name: name
+          skin: skin
+          x: 6
+          "y": 1
+          layer: ""
+          interactions: ""
+        - access: ""
+          map_id: 0
+          name: name
+          skin: skin
+          x: 6
+          "y": 1
+          layer: ""
+          interactions: ""
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/MapSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[MapSchema]"
+    StaticDataPage_MonsterSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - attack_fire: 1
+          code: code
+          initiative: 7
+          min_gold: 1
+          level: 0
+          hp: 6
+          attack_air: 2
+          res_air: 2
+          res_water: 3
+          type: ""
+          attack_water: 5
+          critical_strike: 4
+          effects:
+          - code: code
+            description: description
+            value: 1
+          - code: code
+            description: description
+            value: 1
+          drops:
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          res_fire: 7
+          max_gold: 1
+          name: name
+          attack_earth: 5
+          res_earth: 9
+        - attack_fire: 1
+          code: code
+          initiative: 7
+          min_gold: 1
+          level: 0
+          hp: 6
+          attack_air: 2
+          res_air: 2
+          res_water: 3
+          type: ""
+          attack_water: 5
+          critical_strike: 4
+          effects:
+          - code: code
+            description: description
+            value: 1
+          - code: code
+            description: description
+            value: 1
+          drops:
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          res_fire: 7
+          max_gold: 1
+          name: name
+          attack_earth: 5
+          res_earth: 9
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/MonsterSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[MonsterSchema]"
+    StaticDataPage_NPCItem_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - npc: npc
+          code: code
+          sell_price: 6
+          currency: currency
+          buy_price: 0
+        - npc: npc
+          code: code
+          sell_price: 6
+          currency: currency
+          buy_price: 0
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/NPCItem"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[NPCItem]"
+    StaticDataPage_NPCSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - code: code
+          name: name
+          description: description
+          type: ""
+          items:
+          - code: code
+            sell_price: 6
+            currency: currency
+            buy_price: 0
+          - code: code
+            sell_price: 6
+            currency: currency
+            buy_price: 0
+        - code: code
+          name: name
+          description: description
+          type: ""
+          items:
+          - code: code
+            sell_price: 6
+            currency: currency
+            buy_price: 0
+          - code: code
+            sell_price: 6
+            currency: currency
+            buy_price: 0
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/NPCSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[NPCSchema]"
+    StaticDataPage_ResourceSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - drops:
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          code: code
+          level: 0
+          skill: ""
+          name: name
+        - drops:
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          - code: code
+            max_quantity: 1
+            min_quantity: 1
+            rate: 1
+          code: code
+          level: 0
+          skill: ""
+          name: name
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/ResourceSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[ResourceSchema]"
+    StaticDataPage_TaskFullSchema_:
+      example:
+        total: 0
+        pages: 0
+        data:
+        - code: code
+          max_quantity: 1
+          min_quantity: 6
+          level: 0
+          skill: skill
+          type: ""
+          rewards: ""
+        - code: code
+          max_quantity: 1
+          min_quantity: 6
+          level: 0
+          skill: skill
+          type: ""
+          rewards: ""
+        size: 1
+        page: 1
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/TaskFullSchema"
+          title: Data
+          type: array
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+          nullable: true
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+          nullable: true
+        size:
+          minimum: 1.0
+          title: Size
+          type: integer
+          nullable: true
+        pages:
+          minimum: 0.0
+          title: Pages
+          type: integer
+          nullable: true
+      required:
+      - data
+      title: "StaticDataPage[TaskFullSchema]"
     StatusResponseSchema:
       example:
         data:

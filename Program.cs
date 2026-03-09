@@ -51,6 +51,7 @@ namespace Artifacts
 
             Events.Config(configuration, httpClient);
             Npcs.Config(configuration, httpClient);
+            await Npcs.Instance.CacheNpcs();
             Resources.Config(configuration, httpClient);
             await Resources.Instance.CacheItems();
             Bank.Config(configuration, httpClient);

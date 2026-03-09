@@ -105,7 +105,7 @@ No authorization required
 
 <a id="getallachievementsachievementsget"></a>
 # **GetAllAchievementsAchievementsGet**
-> DataPageAchievementSchema GetAllAchievementsAchievementsGet (AchievementType? type = null, int? page = null, int? size = null)
+> StaticDataPageAchievementSchema GetAllAchievementsAchievementsGet (AchievementType? type = null, int? page = null, int? size = null)
 
 Get All Achievements
 
@@ -139,7 +139,7 @@ namespace Example
             try
             {
                 // Get All Achievements
-                DataPageAchievementSchema result = apiInstance.GetAllAchievementsAchievementsGet(type, page, size);
+                StaticDataPageAchievementSchema result = apiInstance.GetAllAchievementsAchievementsGet(type, page, size);
                 Debug.WriteLine(result);
             }
             catch (ApiException  e)
@@ -160,7 +160,7 @@ This returns an ApiResponse object which contains the response data, status code
 try
 {
     // Get All Achievements
-    ApiResponse<DataPageAchievementSchema> response = apiInstance.GetAllAchievementsAchievementsGetWithHttpInfo(type, page, size);
+    ApiResponse<StaticDataPageAchievementSchema> response = apiInstance.GetAllAchievementsAchievementsGetWithHttpInfo(type, page, size);
     Debug.Write("Status Code: " + response.StatusCode);
     Debug.Write("Response Headers: " + response.Headers);
     Debug.Write("Response Body: " + response.Data);
@@ -183,7 +183,7 @@ catch (ApiException e)
 
 ### Return type
 
-[**DataPageAchievementSchema**](DataPageAchievementSchema.md)
+[**StaticDataPageAchievementSchema**](StaticDataPageAchievementSchema.md)
 
 ### Authorization
 

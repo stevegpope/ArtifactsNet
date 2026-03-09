@@ -101,7 +101,9 @@ catch (ApiException e)
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | Combat simulation completed successfully. |  -  |
-| **404** | Monster not found. |  -  |
+| **404** | Monster or item not found. |  -  |
+| **486** | Only boss monsters can be fought by multiple characters. |  -  |
+| **451** | Access denied, you must be a member to do that. |  -  |
 | **422** | Request could not be processed due to an invalid payload. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
