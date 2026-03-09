@@ -315,7 +315,15 @@ namespace Artifacts
                 $"task type : {Utils.Details[Name].TaskType}\n" +
                 $"task progress : {Utils.Details[Name].TaskProgress}/{Utils.Details[Name].TaskTotal}");
 
-            await DoItemTask();
+            if (Utils.Details[Name].TaskType == "items")
+            {
+                await DoItemTask();
+            }
+            else
+            {
+                await DoMonstersTask();
+            }
+
             await MoveTo(MapContentType.Bank);
             await DepositAllItems();
             await ExchangeCoins();
@@ -360,6 +368,13 @@ namespace Artifacts
         {
             await HandleItemsTask();
             await MoveTo(MapContentType.TasksMaster, "items");
+            await FinishTask();
+        }
+
+        private async Task DoMonstersTask()
+        {
+            await HandleMonstersTask();
+            await MoveTo(MapContentType.TasksMaster, "monsters");
             await FinishTask();
         }
 
@@ -442,8 +457,9 @@ namespace Artifacts
 
         private async Task AcceptNewTask()
         {
-            // Get new task
-            await MoveTo(MapContentType.TasksMaster, code: "items");
+            var code = "items";
+            await MoveTo(MapContentType.TasksMaster, code: code);
+
             Console.WriteLine($"Getting new task");
             await Utils.ApiCall(async () =>
             {
@@ -860,8 +876,8 @@ namespace Artifacts
         internal async Task TrainFighting(int level)
         {
             var maxLevel = Math.Max(1, Utils.Details[Name].Level - 1);
-            var monsters = Monsters.Instance.GetMonsters(maxLevel);
-            var fightList = monsters.Data.OrderBy(x => x.Level).ToList();
+            var monsters = Monsters.Instance.GetMonsters(maxLevel).Data.Where(x => x.Type != MonsterType.Boss);
+            var fightList = monsters.OrderBy(x => x.Level).ToList();
             var lastXp = 0;
 
             while (Utils.Details[Name].Level < level)
@@ -933,8 +949,8 @@ namespace Artifacts
                             {
                                 Console.WriteLine($"Less XP from {monster.Code}, getting new monsters");
                                 lastXp = 0;
-                                monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1);
-                                fightList = monsters.Data.Where(x => x.Level > Utils.Details[Name].Level - 10).OrderBy(x => x.Level).ToList();
+                                monsters = Monsters.Instance.GetMonsters(Utils.Details[Name].Level - 1).Data.Where(x => x.Type != MonsterType.Boss);
+                                fightList = monsters.Where(x => x.Level > Utils.Details[Name].Level - 10).OrderBy(x => x.Level).ToList();
                                 break;
                             }
                         }
@@ -1419,25 +1435,14 @@ namespace Artifacts
         internal async Task FightLoop(int total, string monster)
         {
             var monstersKilled = 0;
-            var lostLastFight = 0;
             var losses = 0;
 
             await GearUpMonster(monster);
 
             while(monstersKilled < total)
             {
-
                 // If we are healthy enough fight right away
-                var needsRest = false;
-                if (lostLastFight == 0 && Utils.Details[Name].Hp < Utils.Details[Name].MaxXp * .75)
-                {
-                    needsRest = true;
-                }
-                else if (Utils.Details[Name].Hp < lostLastFight)
-                {
-                    needsRest |= true;
-                }
-
+                var needsRest = Utils.Details[Name].Hp < Utils.Details[Name].MaxXp * .75;
                 if (needsRest)
                 {
                     if (await Rest())
@@ -1454,7 +1459,6 @@ namespace Artifacts
                 {
                     var hp = Utils.Details[Name].Hp;
                     var result = await Fight();
-                    lostLastFight = hp - Utils.Details[Name].Hp;
                     if (result.Data.Fight.Result == FightResult.Win)
                     {
                         monstersKilled++;
@@ -1468,8 +1472,9 @@ namespace Artifacts
                         Console.WriteLine($"loss {losses}/{Limit}");
                         if (losses >= Limit)
                         {
-                            Console.WriteLine($"We Lost! Giving up on monster {monster}");
-                            return;
+                            Console.WriteLine($"Training up to level {Utils.Details[Name].Level + 1}");
+                            await TrainFighting(Utils.Details[Name].Level + 1);
+                            continue;
                         }
                     }
                 }
@@ -1481,6 +1486,7 @@ namespace Artifacts
                         Console.WriteLine("Inventory full, be right back");
                         await MoveTo(MapContentType.Bank);
                         await DepositAllItems();
+                        continue;
                     }
 
                     return;
@@ -2341,11 +2347,15 @@ namespace Artifacts
                     if (ex.ErrorCode == 483)
                     {
                         // Not enough hp to unequip
-                        Console.WriteLine($"Not enough HP to unequip {slotType}, resting");
-                        await Utils.ApiCall(async () =>
+                        Console.WriteLine($"Not enough HP to unequip {slotType}, eat/rest");
+                        if (!await EatSomething())
                         {
-                            return await _api.ActionRestMyNameActionRestPostAsync(Name);
-                        });
+                            Console.WriteLine("Rest");
+                            await Utils.ApiCall(async () =>
+                            {
+                                return await _api.ActionRestMyNameActionRestPostAsync(Name);
+                            });
+                        }
 
                         return await Unequip(slotType);
                     }

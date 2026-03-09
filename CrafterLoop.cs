@@ -50,11 +50,6 @@ namespace Artifacts
                     await CheckForGold();
                     await ProcessEvents();
 
-                    if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
-                    {
-                        await _character.PerformTask();
-                    }
-
                     var currentCraft = _craftManager.GetCurrentCraft();
                     if (currentCraft != null)
                     {
@@ -77,9 +72,14 @@ namespace Artifacts
                     await _character.MoveTo(MapContentType.Bank);
                     await _character.DepositAllItems();
 
+                    if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
+                    {
+                        await _character.PerformTask();
+                    }
+
                     await MakeJewels();
 
-                    if (_random.Next(10) == 0)
+                    if (_random.Next(10) <= 1)
                     {
                         await _character.PerformTask();
                     }
@@ -110,7 +110,7 @@ namespace Artifacts
                     var bankItems = await Bank.Instance.GetItems();
 
                     // Filter out items retrieved from bosses
-                    //items = FilterBossItems(items, bankItems);
+                    items = FilterBossItems(items, bankItems);
 
                     // Filter out items that require a resource we can't get if we don't have the resource in the bank
                     items = FilterTaskItems(items, bankItems);
@@ -389,7 +389,7 @@ namespace Artifacts
                     if (amount > 0)
                     {
                         await _character.MoveTo(MapContentType.Bank);
-                        var withdrawn = await _character.WithdrawItems(bankItem.Code);
+                        var withdrawn = await _character.WithdrawItems(bankItem.Code, amount);
                         if (withdrawn > 0)
                         {
                             Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
@@ -403,29 +403,38 @@ namespace Artifacts
 
         private int GetSellQuantity(ItemSchema itemDetails, int bankAmount, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
         {
-            var amountToSell = bankAmount;
+            var currentAmount = CountAmountEverywhere(itemDetails.Code, characters, bankItems);
 
             if (itemDetails.Effects != null && itemDetails.Effects.Count > 0)
             {
                 // Leave 5 of an item, 10 of a ring
-                var currentAmount = CountAmountEverywhere(itemDetails.Code, characters, bankItems);
                 var limit = itemDetails.Type == "ring" ? 10 : 5;
+                var amountToSell = currentAmount - limit;
                 if (currentAmount > limit)
                 {
-                    return Math.Min(currentAmount - limit, bankAmount);
+                    Console.WriteLine($"Have {currentAmount} {itemDetails.Code}, it has effects, sell {amountToSell}/{currentAmount}");
+                    return amountToSell;
+                }
+                else
+                {
+                    return 0;
                 }
             }
 
             var items = Items.GetAllItems();
-            var recipes = items.Values.Where(i => i.Craft != null && i.Craft.Items.Any(c => c.Code == itemDetails.Code));
-            if (recipes.Any())
+            var recipe = items.Values.FirstOrDefault(i => i.Craft != null && i.Craft.Items.Any(c => c.Code == itemDetails.Code));
+            if (recipe != null)
             {
-                // Leave enough to craft 5 of the next item up, we don't want to sell so many that we can't craft better items
-                amountToSell = bankAmount - 5;
-                Console.WriteLine($"We have {bankAmount} {itemDetails.Code}, recipes need it, so we will only sell {amountToSell}");
+                // Leave enough to craft 5 of something
+                var component = recipe.Craft.Items.First(c => c.Code == itemDetails.Code);
+                var amountToKeep = component.Quantity * 5;
+                var amountToSell = Math.Min(currentAmount - amountToKeep, bankAmount);
+                Console.WriteLine($"Have {bankAmount} {itemDetails.Code}, recipes need it, sell {amountToSell}/{currentAmount}");
+                return amountToSell;
             }
 
-            return Math.Min(amountToSell, 100);
+            Console.WriteLine($"Have {bankAmount} {itemDetails.Code}, not needed, sell {bankAmount}");
+            return bankAmount;
         }
 
         private async Task<CraftResult> CraftItems(int craftAmount, int level, List<ItemSchema> items, List<SimpleItemSchema> bankItems)
