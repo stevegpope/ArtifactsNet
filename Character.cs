@@ -882,7 +882,7 @@ namespace Artifacts
 
         internal async Task TrainFighting(int level)
         {
-            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 1);
+            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 2);
             var monsters = Monsters.Instance.GetMonsters(maxLevel).Where(x => x.Type != MonsterType.Boss);
             var fightList = monsters.OrderBy(x => x.Level).ToList();
             var lastXp = 0;
