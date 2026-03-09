@@ -2367,11 +2367,8 @@ namespace Artifacts
 
                         return await Unequip(slotType);
                     }
-                    else
-                    {
-                        Console.WriteLine($"Unequip error: {ex.ErrorContent}");
-                        throw;
-                    }
+
+                    throw;
                 }
             }) as EquipmentResponseSchema;
         }
