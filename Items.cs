@@ -152,11 +152,13 @@ namespace Artifacts
                     case "threat":
                     case "inventory_space":
                     case "critical_strike":
-                    case "wisdom":
-                    case "prospecting":
                     case "haste":
                     case "initative":
-                        value += effect.Value * 0.1;
+                        value += effect.Value;
+                        continue;
+                    case "wisdom":
+                    case "prospecting":
+                        value += effect.Value / 2;
                         continue;
                     case "dmg":
                     case "heal":

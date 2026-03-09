@@ -34,10 +34,8 @@ namespace Artifacts
                 _subtracting = false;
                 _millisToSubtract -= MillisToSubtractPerCall;
                 _millisToSubtract = Math.Max(0, _millisToSubtract);
-                Console.WriteLine($"millisToSubtract: {_millisToSubtract}");
             }
 
-            Console.WriteLine($"In Cooldown, next {_nextCall} now {DateTime.UtcNow}");
             var seconds = GetCooldownSeconds(errorContent);
             if (seconds > 0)
             {
@@ -52,7 +50,6 @@ namespace Artifacts
                 _lastSubtract = DateTime.UtcNow;
                 _subtracted = true;
                 _millisToSubtract += MillisToSubtractPerCall;
-                Console.WriteLine($"Millis to subtract {_millisToSubtract}");
             }
 
             double cooldownMillis = milliseconds - _millisToSubtract;
@@ -75,7 +72,7 @@ namespace Artifacts
                 int hashes = (int)Math.Round(barWidth * progress);
 
                 string bar = new string('#', hashes).PadRight(barWidth, ' ');
-                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{cooldownMillis:F0}s, saved {TimeSpan.FromMilliseconds(_savedMs)}");
+                Console.Write($"\rCooldown [{bar}] {remaining:F0}/{cooldownMillis:F0}s");
 
                 var wait = Math.Min(Math.Ceiling(remaining), 1000);
                 await Task.Delay((int)wait);

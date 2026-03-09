@@ -82,7 +82,7 @@ namespace Artifacts
             }
 
             await Task.WhenAll(gearUpTasks);
-            await FightLoop(topGuys.Take(3), boss);
+            await BossFightLoop(topGuys.Take(3), boss);
         }
 
         private static ItemSchema ChooseWeapon()
@@ -91,7 +91,7 @@ namespace Artifacts
             return weapons.ElementAt(Random.Shared.Next(weapons.Count()));
         }
 
-        internal static async Task FightLoop(IEnumerable<Character> enumerable, string boss)
+        internal static async Task BossFightLoop(IEnumerable<Character> enumerable, string boss)
         {
             Console.WriteLine("Boss Fight!");
 
