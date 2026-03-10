@@ -40,18 +40,8 @@ namespace Artifacts
 
             static async Task gearUp(Character character)
             {
-                await character.MoveTo(MapContentType.Bank);
                 await character.DepositAllItems();
                 await character.GearUpMonster(boss);
-                Console.WriteLine($"{character.Name} gear up 1 complete");
-                await character.GearUpMonster(boss);
-                Console.WriteLine($"{character.Name} gear up 2 complete");
-                await character.GearUpMonster(boss);
-                Console.WriteLine($"{character.Name} gear up 3 complete");
-                await character.GearUpMonster(boss);
-                Console.WriteLine($"{character.Name} gear up 4 complete");
-                await character.GearUpMonster(boss);
-                Console.WriteLine($"{character.Name} gear up 5 complete");
                 Console.WriteLine($"{character.Name} READY FOR {boss}");
             }
 
@@ -70,10 +60,9 @@ namespace Artifacts
                     while (true)
                     {
                         Console.WriteLine($"Support role loop {guy.Name}");
-                        await guy.MoveTo(MapContentType.Bank);
                         await guy.DepositAllItems();
 
-                        var slot = Random.Shared.Next(2) == 1 ? ItemSlot.Utility1 : ItemSlot.Utility2;
+                        var slot = Random.Shared.Next(2) == 0 ? ItemSlot.Utility1 : ItemSlot.Utility2;
                         ItemSchema weapon = ChooseWeapon();
                         ItemSchema potion = guy.ChoosePotion(monster, slot, weapon);
                         await guy.CraftItems(potion, 25);
@@ -166,7 +155,6 @@ namespace Artifacts
                         {
                             var task = Task.Run(async () =>
                             {
-                                await character.MoveTo(MapContentType.Bank);
                                 await character.DepositAllItems();
                             });
 

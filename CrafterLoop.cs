@@ -69,7 +69,6 @@ namespace Artifacts
                     }
 
                     // Start at the bank with no inventory
-                    await _character.MoveTo(MapContentType.Bank);
                     await _character.DepositAllItems();
 
                     if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
@@ -132,7 +131,6 @@ namespace Artifacts
                     }
 
                     // Go deposit the results in the bank
-                    await _character.MoveTo(MapContentType.Bank);
                     await _character.DepositAllItems();
 
                     // Recycle leftovers
@@ -205,7 +203,6 @@ namespace Artifacts
                                 break;
                             }
 
-                            await _character.MoveTo(MapContentType.Bank);
                             await _character.DepositAllItems();
                             purchaseQuantity -= batch;
                         }
@@ -435,12 +432,13 @@ namespace Artifacts
             await _character.FightLoop(100, monster.Code);
         }
 
-        private async Task ProcessMerchant(ActiveEventSchema activeEvent)
+        internal async Task ProcessMerchant(ActiveEventSchema activeEvent)
         {
             Console.WriteLine($"{activeEvent.Code} is present, trying to sell stuff");
 
             var items = Npcs.Instance.GetNpcItems(activeEvent.Code);
             var bankItems = await Bank.Instance.GetItems();
+            var npcs = Npcs.GetAllNpcs().Values;
             foreach (var item in items)
             {
                 if (item?.SellPrice == null || item.SellPrice < 100)
@@ -455,23 +453,24 @@ namespace Artifacts
                 {
                     bankItems = await Bank.Instance.GetItems();
                     var characters = await _character.GetAllCharacters();
-                    var amount = GetSellQuantity(itemDetails, bankItem.Quantity, characters, bankItems);
+                    var amount = GetSellQuantity(itemDetails, bankItem.Quantity, characters, bankItems, npcs);
                     if (amount > 0)
                     {
                         await _character.MoveTo(MapContentType.Bank);
-                        var withdrawn = await _character.WithdrawItems(bankItem.Code, amount);
+                        var withdrawn = await _character.WithdrawItems(bankItem.Code);
                         if (withdrawn > 0)
                         {
+                            var sellAmount = Math.Min(amount, withdrawn);
                             Console.WriteLine($"Going to sell {withdrawn} {bankItem.Code} to {activeEvent.Code}");
                             await _character.Move(activeEvent.Map.X, activeEvent.Map.Y);
-                            await _character.SellNpc(bankItem.Code, withdrawn);
+                            await _character.SellNpc(bankItem.Code, sellAmount);
                         }
                     }
                 }
             }
         }
 
-        private int GetSellQuantity(ItemSchema itemDetails, int bankAmount, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
+        private int GetSellQuantity(ItemSchema itemDetails, int bankAmount, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems, IEnumerable<NPCSchema> npcs)
         {
             var currentAmount = CountAmountEverywhere(itemDetails.Code, characters, bankItems);
 
@@ -501,6 +500,20 @@ namespace Artifacts
                 var amountToSell = Math.Min(currentAmount - amountToKeep, bankAmount);
                 Console.WriteLine($"Have {bankAmount} {itemDetails.Code}, recipes need it, sell {amountToSell}/{currentAmount}");
                 return amountToSell;
+            }
+
+            // Do we need them for NPC purchases?
+            foreach (var npc in npcs)
+            {
+                var purchase = npc.Items.FirstOrDefault(i => i.Currency == itemDetails.Code && i.BuyPrice != null && i.BuyPrice.Value > 0);
+                if (purchase != null)
+                {
+                    // Keep enough to buy 5 of them
+                    var amountToKeep = purchase.BuyPrice.Value * 5;
+                    var amountToSell = Math.Min(currentAmount - amountToKeep, bankAmount);
+                    Console.WriteLine($"Have {bankAmount} {itemDetails.Code}, NPCs need it, sell {amountToSell}/{currentAmount}");
+                    return amountToSell;
+                }
             }
 
             Console.WriteLine($"Have {bankAmount} {itemDetails.Code}, not needed, sell {bankAmount}");
@@ -607,7 +620,6 @@ namespace Artifacts
             // Remove anything that isn't made of resources
             var newItems = items.Where(x => IsMadeOfBaseResources(x.Code)).ToList();
 
-            await _character.MoveTo(MapContentType.Bank);
             await _character.DepositAllItems();
                     
             var result = await CraftItemsAtLevel(targetLevel, craftAmount, newItems, bankItems, ignoreBankCheck: true);
@@ -680,7 +692,6 @@ namespace Artifacts
                             await _character.Recycle(item.Code, recycleQuantity);
 
                             // Bank to bank for deposit
-                            await _character.MoveTo(MapContentType.Bank);
                             await _character.DepositAllItems();
 
                             // Start again to recheck state of the bank etc
@@ -719,12 +730,6 @@ namespace Artifacts
                 limit = 10;
             }
 
-            if (currentAmount > limit)
-            {
-                Console.WriteLine($"Recycle {currentAmount - limit} {bankItem.Code} because we have {currentAmount} in total");
-                return currentAmount - limit;
-            }
-
             List<ItemSchema> comparables = new List<ItemSchema>();
             foreach (var otherBankItem in bankItems)
             {
@@ -758,7 +763,7 @@ namespace Artifacts
                             break;
                         }
 
-                        if (comparableEffect.Value < effect.Value)
+                        if (Math.Abs(comparableEffect.Value) < Math.Abs(effect.Value))
                         {
                             better = false;
                             break;
@@ -768,10 +773,16 @@ namespace Artifacts
                     if (better)
                     {
                         // All effects are better on the new item, we can get rid of all this one
-                        Console.WriteLine($"Recycle all {bankItem.Quantity} {bankItem.Code} because we have {bankItemAmount} {comparable.Code} in total");
+                        Console.WriteLine($"Recycle all {bankItem.Quantity} {bankItem.Code} because we have {bankItemAmount} {comparable.Code}");
                         return bankItem.Quantity;
                     }
                 }
+            }
+
+            if (currentAmount > limit)
+            {
+                Console.WriteLine($"Recycle {currentAmount - limit} {bankItem.Code} because we have {currentAmount}");
+                return currentAmount - limit;
             }
 
             return 0;

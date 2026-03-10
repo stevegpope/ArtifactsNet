@@ -331,7 +331,6 @@ namespace Artifacts
                 await DoMonstersTask();
             }
 
-            await MoveTo(MapContentType.Bank);
             await DepositAllItems();
             await ExchangeCoins();
         }
@@ -417,7 +416,6 @@ namespace Artifacts
                 Console.WriteLine($"{remaining} {Utils.Details[Name].Task} left for task");
 
                 // Go to bank and deposit all items to make room
-                await MoveTo(MapContentType.Bank);
                 await DepositAllItems();
 
                 var withdrawn = await WithdrawItems(Utils.Details[Name].Task, remaining);
@@ -791,7 +789,7 @@ namespace Artifacts
 
         private async Task<int> GatherResources(ItemSchema doNotUse, int remaining, ItemSchema item, ResourceSchema resource)
         {
-            Console.WriteLine($"Gathering {remaining} {item.Craft} for character {Name}");
+            Console.WriteLine($"Gathering {remaining} {item.Code} for character {Name}");
             var skill = await Resources.Instance.GetResourceSkill(item);
 
             try
@@ -882,7 +880,7 @@ namespace Artifacts
 
         internal async Task TrainFighting(int level)
         {
-            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 2);
+            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 1);
             var monsters = Monsters.Instance.GetMonsters(maxLevel).Where(x => x.Type != MonsterType.Boss);
             var fightList = monsters.OrderBy(x => x.Level).ToList();
             var lastXp = 0;
@@ -967,7 +965,6 @@ namespace Artifacts
                         if (ex.ErrorCode == 497)
                         {
                             Console.WriteLine("Inventory full, cannot fight");
-                            await MoveTo(MapContentType.Bank);
                             await DepositAllItems();
                         }
 
@@ -1069,7 +1066,6 @@ namespace Artifacts
             }
 
             // Go deposit the results in the bank
-            await MoveTo(MapContentType.Bank);
             await DepositAllItems();
         }
 
@@ -1100,7 +1096,6 @@ namespace Artifacts
                             if (ex.ErrorCode == 497)
                             {
                                 Console.WriteLine("Inventory full, cannot fight");
-                                await MoveTo(MapContentType.Bank);
                                 await DepositExcept(new List<string>([code]));
                                 await GearUpMonster(monster);
                             }
@@ -1141,8 +1136,10 @@ namespace Artifacts
                         Console.WriteLine($"loss {losses}/{Limit}");
                         if (losses >= Limit)
                         {
-                            Console.WriteLine($"We Lost! Giving up on getting drops for monster {monster}");
-                            return 0;
+                            Console.WriteLine($"We Lost! Training for monster {monster}");
+                            losses = 0;
+                            await TrainFighting(Utils.Details[Name].Level + 1);
+                            continue;
                         }
                     }
                     else
@@ -1166,7 +1163,6 @@ namespace Artifacts
                     if (ex.ErrorCode == 497)
                     {
                         Console.WriteLine("Inventory full, cannot fight");
-                        await MoveTo(MapContentType.Bank);
                         await DepositExcept(new List<string>([code]));
                         break;
                     }
@@ -1247,6 +1243,8 @@ namespace Artifacts
             try
             {
                 Console.WriteLine($"Deposit:");
+                await MoveTo(MapContentType.Bank);
+
                 foreach (var item in items)
                 {
                     Console.WriteLine($"{item.Quantity} {item.Code}");
@@ -1319,7 +1317,6 @@ namespace Artifacts
                 return;
             }
 
-            await MoveTo(MapContentType.Bank);
             await DepositItems(items);
         }
 
@@ -1495,7 +1492,6 @@ namespace Artifacts
                     if (ex.ErrorCode == 497)
                     {
                         Console.WriteLine("Inventory full, be right back");
-                        await MoveTo(MapContentType.Bank);
                         await DepositAllItems();
                         continue;
                     }
@@ -1543,21 +1539,15 @@ namespace Artifacts
                 }
 
                 var item = Items.GetItem(inventoryItem.Code);
-                if (item.Type == "consumable")
+                var heal = item?.Effects.Where(x => x.Code == "heal").Sum(x => x.Value);
+                if (item.Type == "consumable" && heal > 0)
                 {
-                    var heal = item.Effects.Where(x => x.Code == "heal").Sum(x => x.Value);
-                    if (heal == 0)
-                    {
-                        Console.WriteLine($"WARNING!!! {item.Code} is not healing!");
-                        continue;
-                    }
-
                     var idealQuantity = 0;
                     var currentAmount = 0;
                     while (currentAmount < amountToHeal)
                     {
                         idealQuantity++;
-                        currentAmount += heal;
+                        currentAmount += heal.Value;
                     }
 
                     var quantity = Math.Min(idealQuantity, inventoryItem.Quantity);
@@ -1863,7 +1853,8 @@ namespace Artifacts
                 if (inventoryItem.Quantity == 0) continue;
 
                 var item = Items.GetItem(inventoryItem.Code);
-                if (item.Type == "consumable")
+                var heal = item?.Effects.Where(x => x.Code == "heal").Sum(x => x.Value);
+                if (item.Type == "consumable" && heal > 0)
                 {
                     total += inventoryItem.Quantity;
                 }
@@ -1890,7 +1881,8 @@ namespace Artifacts
                 if (bankItem.Quantity > 0)
                 {
                     var item = Items.GetItem(bankItem.Code);
-                    if (item.Type == "consumable" && item.Level <= Utils.Details[Name].Level)
+                    var heal = item?.Effects.Where(x => x.Code == "heal").Sum(x => x.Value);
+                    if (item.Type == "consumable" && heal > 0 && item.Level <= Utils.Details[Name].Level)
                     {
                         var amount = Math.Min(space, bankItem.Quantity);
 
@@ -2035,7 +2027,6 @@ namespace Artifacts
                     Console.WriteLine($"Chef Cooked {batch} {recipe.Code}");
                     if (batch > 0)
                     {
-                        await MoveTo(MapContentType.Bank);
                         await DepositItem(recipe.Code, batch);
 
                         // Cook more if we can
@@ -2502,7 +2493,6 @@ namespace Artifacts
 
             if (claimed)
             {
-                await MoveTo(MapContentType.Bank);
                 await DepositAllItems();
             }
         }
