@@ -54,7 +54,7 @@ namespace Artifacts
         internal async Task<List<SimpleItemSchema>> GetItems()
         {
             var pageNum = 1;
-            var result = new List<SimpleItemSchema>();
+            var result = new Dictionary<string, SimpleItemSchema>();
             DataPageSimpleItemSchema page = null;
 
             do
@@ -66,11 +66,22 @@ namespace Artifacts
 
                 page = data as DataPageSimpleItemSchema;
 
-                result.AddRange(page.Data.Where(i => i.Quantity > 0));
+                foreach(var item in page.Data.Where(i => i.Quantity > 0))
+                {
+                    if (result.ContainsKey(item.Code))
+                    {
+                        result[item.Code].Quantity += item.Quantity;
+                    }
+                    else
+                    {
+                        result[item.Code] = item;
+                    }
+                }
+
                 pageNum++;
             } while (pageNum <= page.Pages);
 
-            return result;
+            return result.Values.ToList();
         }
 
         internal async Task<BankSchema> GetBankDetails()

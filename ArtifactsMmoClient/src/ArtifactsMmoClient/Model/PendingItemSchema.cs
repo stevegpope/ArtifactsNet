@@ -142,7 +142,7 @@ namespace ArtifactsMmoClient.Model
         /// </summary>
         /// <value>When the pending item was claimed.</value>
         [DataMember(Name = "claimed_at", EmitDefaultValue = false)]
-        public DateTimeOffset ClaimedAt { get; set; }
+        public DateTimeOffset? ClaimedAt { get; set; }
 
         /// <summary>
         /// Gets or Sets additional properties

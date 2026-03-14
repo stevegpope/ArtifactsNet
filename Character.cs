@@ -53,7 +53,7 @@ namespace Artifacts
             }
 
             Console.WriteLine($"Move to {x},{y}");
-            await Utils.ApiCall(async () =>
+            await Utils.ApiCall(Name, async () =>
             {
                 try
                 {
@@ -90,7 +90,10 @@ namespace Artifacts
         {
             Console.WriteLine($"Moving {Name} to {locationType}, code {code}");
             var response = await Map.Instance.GetMapLayer(locationType, code);
-            if (response == null) return;
+            if (response == null)
+            {
+                throw new Exception($"No locations found for type {locationType} and code {code}");
+            }
 
             if (response != null && response.Count != 0)
             {
@@ -120,7 +123,7 @@ namespace Artifacts
             Console.WriteLine($"Turning in {quantity} {code} for character {Name}");
             try
             {
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     var item = new SimpleItemSchema(code, quantity);
                     return await _api.ActionTaskTradeMyNameActionTaskTradePostAsync(Name, item);
@@ -213,11 +216,13 @@ namespace Artifacts
 
             try
             {
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     Console.WriteLine($"Craft {quantity} {item.Code}");
+                    var levelBefore = GetSkillLevel(item.Craft.Skill.ToString());
                     var response = await _api.ActionCraftingMyNameActionCraftingPostAsync(Name, new CraftingSchema(item.Code, quantity));
-                    Console.WriteLine($"{Name} Xp: {response.Data.Details.Xp}");
+                    var levelAfter = GetSkillLevel(item.Craft.Skill.ToString());
+                    Console.WriteLine($"{Name} Xp: {response.Data.Details.Xp} level {levelBefore}/{levelAfter}");
                     Console.WriteLine($"{Name} crafted {quantity} {item.Code}");
                     return response;
                 });
@@ -388,7 +393,7 @@ namespace Artifacts
         {
             List<SimpleItemSchema> rewards = new List<SimpleItemSchema>();
 
-            await Utils.ApiCall(async () =>
+            await Utils.ApiCall(Name, async () =>
             {
                 var result = await _api.ActionCompleteTaskMyNameActionTaskCompletePostAsync(Name);
                 Console.WriteLine($"Finished task! {result.Data.Rewards.Gold} Gold");
@@ -466,7 +471,7 @@ namespace Artifacts
             await MoveTo(MapContentType.TasksMaster, code: code);
 
             Console.WriteLine($"Getting new task");
-            await Utils.ApiCall(async () =>
+            await Utils.ApiCall(Name, async () =>
             {
                 var result = await _api.ActionAcceptNewTaskMyNameActionTaskNewPostAsync(Name);
                 Console.WriteLine($"new task: " + result.Data.Task.ToJson());
@@ -491,7 +496,7 @@ namespace Artifacts
                         while (amount >= 6)
                         {
                             Console.WriteLine($"Exchange task coins");
-                            await Utils.ApiCall(async () =>
+                            await Utils.ApiCall(Name, async () =>
                             {
                                 var result = await _api.ActionTaskExchangeMyNameActionTaskExchangePostAsync(Name);
                                 Console.WriteLine($"Got rewards: {result.Data.Rewards.Gold} gold, {string.Join(',', result.Data.Rewards.Items.Select(item => item.Code))}");
@@ -696,7 +701,7 @@ namespace Artifacts
         private async Task<GETransactionResponseSchema> BuyExchangeOrder(string orderId, int quantity)
         {
             Console.WriteLine($"Order {quantity} from {orderId}");
-            return await Utils.ApiCall(async () =>
+            return await Utils.ApiCall(Name, async () =>
             {
                 return await _api.ActionGeBuyItemMyNameActionGrandexchangeBuyPostAsync(Name, new GEBuyOrderSchema(orderId, quantity));
             }) as GETransactionResponseSchema;
@@ -768,7 +773,7 @@ namespace Artifacts
 
                 try
                 {
-                    await Utils.ApiCall(async () =>
+                    await Utils.ApiCall(Name, async () =>
                     {
                         Console.WriteLine($"Buy {amountToPurchase} {code} from NPC");
                         return await _api.ActionNpcBuyItemMyNameActionNpcBuyPostAsync(Name, new NpcMerchantBuySchema(code, quantity));
@@ -816,12 +821,13 @@ namespace Artifacts
             var leftToGet = remaining - gathered;
             while (leftToGet > 0)
             {
-                var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: (int)(leftToGet * Utils.LastCooldown));
+                var estimatedTime = new TimeSpan(hours: 0, minutes: 0, seconds: (int)(leftToGet * Utils.LastCooldown(Name)));
                 Console.WriteLine($"{gathered}/{remaining} {item.Code} ETA: {estimatedTime}");
 
                 try
                 {
-                    var result = await Utils.ApiCall(async () =>
+                    var levelBefore = GetSkillLevel(skill);
+                    var result = await Utils.ApiCall(Name, async () =>
                     {
                         return await _api.ActionGatheringMyNameActionGatheringPostAsync(Name);
                     });
@@ -829,7 +835,8 @@ namespace Artifacts
                     if (result == null) continue;
 
                     var schema = result as SkillResponseSchema;
-                    Console.WriteLine($"XP: {schema.Data.Details.Xp}");
+                    var levelAfter = GetSkillLevel(skill);
+                    Console.WriteLine($"XP: {schema.Data.Details.Xp} level {levelBefore}/{levelAfter}");
                     foreach (var drop in schema.Data.Details.Items)
                     {
                         Console.WriteLine($"drop: {drop.Quantity} {drop.Code}");
@@ -868,10 +875,17 @@ namespace Artifacts
             var monster = monsters.MinBy(x => x.Level);
             Console.WriteLine($"Need to fight for {code}, chasing {monster}");
 
-            if (monster.Level > Utils.Details[Name].Level || monster.Type == MonsterType.Boss)
+            if (monster.Type == MonsterType.Boss)
+            {
+                Console.WriteLine($"We can't beat {monster.Code}");
+                return 0;
+            }
+
+            if (monster.Level > Utils.Details[Name].Level)
             {
                 Console.WriteLine($"We can't beat {monster.Code}, training");
                 await TrainFighting(monster.Level + 1);
+                await GearUpMonster(monster.Code);
             }
 
             var drops = await FightDrops(monster.Code, code, remaining);
@@ -880,7 +894,7 @@ namespace Artifacts
 
         internal async Task TrainFighting(int level)
         {
-            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 1);
+            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 6);
             var monsters = Monsters.Instance.GetMonsters(maxLevel).Where(x => x.Type != MonsterType.Boss);
             var fightList = monsters.OrderBy(x => x.Level).ToList();
             var lastXp = 0;
@@ -1139,6 +1153,7 @@ namespace Artifacts
                             Console.WriteLine($"We Lost! Training for monster {monster}");
                             losses = 0;
                             await TrainFighting(Utils.Details[Name].Level + 1);
+                            await GearUpMonster(monster);
                             continue;
                         }
                     }
@@ -1242,15 +1257,15 @@ namespace Artifacts
         { 
             try
             {
-                Console.WriteLine($"Deposit:");
                 await MoveTo(MapContentType.Bank);
 
+                Console.WriteLine($"Deposit:");
                 foreach (var item in items)
                 {
                     Console.WriteLine($"{item.Quantity} {item.Code}");
                 }
 
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     return await _api.ActionDepositBankItemMyNameActionBankDepositItemPostAsync(Name, items);
                 });
@@ -1290,7 +1305,7 @@ namespace Artifacts
             if (withdrawn == bankDetails.NextExpansionCost)
             {
                 Console.WriteLine($"{Name} buying bank expansion for {bankDetails.NextExpansionCost}");
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     return await _api.ActionBuyBankExpansionMyNameActionBankBuyExpansionPostAsync(Name);
                 });
@@ -1343,7 +1358,7 @@ namespace Artifacts
 
             try
             {
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     Console.WriteLine($"Depositing {Utils.Details[Name].Gold} gold for character {Name}");
                     var response = await _api.ActionDepositBankGoldMyNameActionBankDepositGoldPostAsync(Name, new DepositWithdrawGoldSchema(quantity: Utils.Details[Name].Gold));
@@ -1360,7 +1375,7 @@ namespace Artifacts
         {
             try
             {
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     Console.WriteLine($"Withdrawing {quantity} gold for character {Name}");
                     var response = await _api.ActionWithdrawBankGoldMyNameActionBankWithdrawGoldPostAsync(Name, new DepositWithdrawGoldSchema(quantity: quantity));
@@ -1410,7 +1425,7 @@ namespace Artifacts
 
             try
             {
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     var items = new List<SimpleItemSchema> { new SimpleItemSchema(code, withdrawQuantity) };
                     return await _api.ActionWithdrawBankItemMyNameActionBankWithdrawItemPostAsync(Name, items);
@@ -1443,7 +1458,6 @@ namespace Artifacts
 
             var monsterSchema = Monsters.GetMonster(monster);
             await TrainFighting(monsterSchema.Level + 1);
-
             await GearUpMonster(monster);
 
             while(monstersKilled < total)
@@ -1570,7 +1584,7 @@ namespace Artifacts
             try
             {
                 Console.WriteLine($"{Name} consuming {quantity} {code}");
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     return await _api.ActionUseItemMyNameActionUsePostAsync(Name, new SimpleItemSchema(code, quantity));
                 });
@@ -1604,7 +1618,7 @@ namespace Artifacts
             var result = await Utils.ApiCallGet(async () =>
             {
                 var response = await _api.ActionFightMyNameActionFightPostAsync(Name, new FightRequestSchema(participants));
-                Console.WriteLine($"Fight {response.Data.Fight.Result}!!!");
+                Console.WriteLine($"Fight {response.Data.Fight.Result}");
                 foreach (var characterResponse in response.Data.Fight.Characters)
                 {
                     Console.WriteLine($"XP: {characterResponse.Xp}");
@@ -1645,8 +1659,6 @@ namespace Artifacts
             await EquipBestForSkill(Utils.Details[Name].Artifact1Slot, ItemSlot.Artifact1, skill, bankItems, doNotUse);
             await EquipBestForSkill(Utils.Details[Name].Artifact2Slot, ItemSlot.Artifact2, skill, bankItems, doNotUse);
             await EquipBestForSkill(Utils.Details[Name].Artifact3Slot, ItemSlot.Artifact3, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].Utility1Slot, ItemSlot.Utility1, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].Utility2Slot, ItemSlot.Utility2, skill, bankItems, doNotUse);
             await EquipBestForSkill(Utils.Details[Name].BagSlot, ItemSlot.Bag, skill, bankItems, doNotUse);
             await EquipBestForSkill(Utils.Details[Name].RuneSlot, ItemSlot.Rune, skill, bankItems, doNotUse);
         }
@@ -1693,6 +1705,11 @@ namespace Artifacts
                         await Unequip(slotType);
 
                     await Equip(bestBankItem.Code, slotType);
+                }
+                else
+                {
+                    bankItems = await Bank.Instance.GetItems();
+                    await EquipBestForSkill(currentEquipped, slotType, skill, bankItems, doNotUse);
                 }
             }
         }
@@ -1787,6 +1804,24 @@ namespace Artifacts
             var bankItems = await Bank.Instance.GetItems();
 
             await GetFood();
+            if (monster.Effects.Any(effect => effect.Code == "poison"))
+            {
+                // Do not fight a venomous monster without antidote
+                if (!Utils.Details[Name].Utility2Slot.Contains("antidote") || Utils.Details[Name].Utility2SlotQuantity <= 0)
+                {
+                    var antidote = ChooseAntidote();
+                    var amount = await GatherItems(antidote, 25);
+                    if (amount > 0)
+                    {
+                        await Equip(antidote, ItemSlot.Utility2, 25);
+                    }
+                    else
+                    {
+                        throw new Exception($"Cannot make or gather {antidote}");
+                    }
+                }
+            }
+           
 
             // The damage bonuses of supplementary equipment do not count if the weapon does not have the damage type
             var weapon = await EquipBestForMonster(Utils.Details[Name].WeaponSlot, ItemSlot.Weapon, monster, bankItems, null);
@@ -1808,6 +1843,32 @@ namespace Artifacts
             await EquipBestForMonster(Utils.Details[Name].RuneSlot, ItemSlot.Rune, monster, bankItems, weapon);
         }
 
+        private string ChooseAntidote()
+        {
+            var items = Items.GetAllItems();
+            var skillLevel = GetSkillLevel("alchemy");
+
+            ItemSchema bestItem = null;
+            double bestValue = 0.0;
+
+            foreach(var item in items.Values.Where(x => x.Craft != null && x.Craft.Skill == CraftSkill.Alchemy))
+            {
+                if (item.Level > Utils.Details[Name].Level || item.Level > skillLevel)
+                {
+                    continue;
+                }
+
+                var effect = item.Effects.FirstOrDefault(x => x.Code == "antipoison");
+                if (effect != null && effect.Value > bestValue)
+                {
+                    bestItem = item;
+                    bestValue = effect.Value;
+                }
+            }
+
+            return bestItem.Code;
+        }
+
         internal int GetSkillLevel(string skill)
         {
             return skill.ToLower() switch
@@ -1824,7 +1885,7 @@ namespace Artifacts
             };
         }
 
-        private async Task<bool> GetFood()
+        internal async Task<bool> GetFood()
         {
             const int Threshold = 50;
 
@@ -1924,39 +1985,46 @@ namespace Artifacts
             // We already have enough
             if (inventoryAmount >= Threshold) return;
 
-            // Cook everything in the bank
-            var bankAmount = await CookBankFood();
-            if (bankAmount > 0)
+            // Cook enough
+            var remaining = Threshold - inventoryAmount;
+            var bankAmount = await CookBankFood(remaining);
+            if (bankAmount == remaining)
             {
-                // Get whatever we need or can from the bank
-                var amount = Math.Min(bankAmount, Threshold - inventoryAmount);
-                bankAmount = await GetFoodFromBank(amount);
+                return;
             }
 
-            if (inventoryAmount + bankAmount < Threshold)
+            remaining -= bankAmount;
+
+            if (remaining > 0)
             {
-                Console.WriteLine($"{inventoryAmount + bankAmount}/{Threshold} cooked, lets get fish to cook");
-                var recipes = GetRecipes("cooking");
-                var topDown = recipes.Where(x => x.Level <= Utils.Details[Name].Level).OrderByDescending(x => x.Level);
-                foreach (var recipe in topDown)
+                await GatherFishAndCook(remaining);
+            }
+        }
+
+        internal async Task<string> GatherFishAndCook(int remaining)
+        {
+            Console.WriteLine($"{remaining} food needed, lets get fish to cook");
+            var recipes = GetRecipes("cooking");
+            var topDown = recipes.Where(x => x.Level <= Utils.Details[Name].Level).OrderByDescending(x => x.Level);
+            foreach (var recipe in topDown)
+            {
+                if (recipe.Craft.Items.Count > 1) continue;
+
+                var component = recipe.Craft.Items.First();
+                if (component.Quantity > 1) continue;
+
+                var item = Items.GetItem(component.Code);
+                if (item.Subtype == "fishing")
                 {
-                    if (recipe.Craft.Items.Count > 1) continue;
-
-                    var component = recipe.Craft.Items.First();
-                    if (component.Quantity > 1) continue;
-
-                    var item = Items.GetItem(component.Code);
-                    if (item.Subtype == "fishing")
+                    Console.WriteLine($"Chef going for {remaining} {item.Code}");
+                    if (await GatherItems(recipe.Code, remaining, ignoreBank: true) > 0)
                     {
-                        var gatherAmount = Threshold - (inventoryAmount + bankAmount);
-                        Console.WriteLine($"Chef going for {gatherAmount} {item.Code}");
-                        if (await GatherItems(recipe.Code, gatherAmount) > 0)
-                        {
-                            return;
-                        }
+                        return recipe.Code;
                     }
                 }
             }
+
+            return null;
         }
 
         internal IEnumerable<ItemSchema> GetRecipes(string skill)
@@ -1997,13 +2065,19 @@ namespace Artifacts
         }
 
 
-        private async Task<int> CookBankFood()
+        private async Task<int> CookBankFood(int amount)
         {
+            if (amount <= 0)
+            {
+                return 0;
+            }
+
             List<SimpleItemSchema> bankItems = await Bank.Instance.GetItems();
 
             // See if we can cook something in the bank
             var recipes = GetRecipes("cooking").OrderByDescending(x => x.Level);
 
+            var total = 0;
             foreach (var recipe in recipes)
             {
                 var quantity = int.MaxValue;
@@ -2023,19 +2097,21 @@ namespace Artifacts
 
                 if (quantity != 0 && quantity != int.MaxValue)
                 {
+                    quantity = Math.Min(quantity, amount - total);
                     var batch = await CraftItems(recipe, quantity, bankOnly: true);
                     Console.WriteLine($"Chef Cooked {batch} {recipe.Code}");
+                    total += batch;
                     if (batch > 0)
                     {
                         await DepositItem(recipe.Code, batch);
 
                         // Cook more if we can
-                        return batch + await CookBankFood();
+                        return total + await CookBankFood(amount - total);
                     }
                 }
             }
 
-            return 0;
+            return total;
         }
 
         private async Task<ItemSchema> EquipBestForMonster(string currentEquipped, ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon)
@@ -2059,17 +2135,6 @@ namespace Artifacts
 
             if (max == currentValue)
             {
-                if ((slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2) && 
-                    currentItem == null && monster.Type == MonsterType.Boss)
-                {
-                    ItemSchema potion = ChoosePotion(monster, slotType, weapon);
-                    var gathered = await GatherItems(potion.Code, 25);
-                    if (gathered > 0)
-                    {
-                        await Equip(potion.Code, slotType, gathered);
-                    }
-                }
-
                 // Special case for utilities. If the value is 0 unequip it
                 if (slotType == ItemSlot.Utility1 || slotType == ItemSlot.Utility2)
                 {
@@ -2135,6 +2200,12 @@ namespace Artifacts
 
                     await Equip(bestBankItem.Code, slotType, withdrawn);
                 }
+                else
+                {
+                    Console.WriteLine($"Could not withdraw {quantity} {bestBankItem.Code}!");
+                    bankItems = await Bank.Instance.GetItems();
+                    return await EquipBestForMonster(currentEquipped, slotType, monster, bankItems, weapon);
+                }
 
                 return bestBankItem;
             }
@@ -2173,7 +2244,7 @@ namespace Artifacts
 
         internal ItemSchema ChoosePotion(MonsterSchema monster, ItemSlot slotType, ItemSchema weapon)
         {
-            var potions = GetRecipes("alchemy").Where(x => x.Level < Utils.Details[Name].Level);
+            var potions = GetRecipes("alchemy").Where(x => x.Level <= Utils.Details[Name].Level);
 
             if (slotType == ItemSlot.Utility1)
             {
@@ -2322,7 +2393,7 @@ namespace Artifacts
 
         internal async Task<EquipmentResponseSchema> Unequip(ItemSlot slotType)
         {
-            return await Utils.ApiCall(async () =>
+            return await Utils.ApiCall(Name, async () =>
             {
                 try
                 {
@@ -2350,7 +2421,7 @@ namespace Artifacts
                         if (!await EatSomething())
                         {
                             Console.WriteLine("Rest");
-                            await Utils.ApiCall(async () =>
+                            await Utils.ApiCall(Name, async () =>
                             {
                                 return await _api.ActionRestMyNameActionRestPostAsync(Name);
                             });
@@ -2368,7 +2439,7 @@ namespace Artifacts
         {
             try
             {
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     Console.WriteLine($"Equip {quantity} {code} in {slotType}");
                     var response = await _api.ActionEquipItemMyNameActionEquipPostAsync(Name, new EquipSchema(code, slotType, quantity));
@@ -2435,7 +2506,7 @@ namespace Artifacts
         {
             Console.WriteLine($"Recycling {recycleQuantity} {code}");
 
-            await Utils.ApiCall(async () =>
+            await Utils.ApiCall(Name, async () =>
             {
                 return await _api.ActionRecyclingMyNameActionRecyclingPostAsync(Name, new RecyclingSchema(code, recycleQuantity));
             });
@@ -2446,7 +2517,7 @@ namespace Artifacts
             try
             {
                 Console.WriteLine($"Selling {quantity} {code} to Npc");
-                await Utils.ApiCall(async () =>
+                await Utils.ApiCall(Name, async () =>
                 {
                     return await _api.ActionNpcSellItemMyNameActionNpcSellPostAsync(Name, new NpcMerchantBuySchema(code, quantity));
                 });
@@ -2460,7 +2531,7 @@ namespace Artifacts
         internal async Task<ClaimPendingItemDataSchema> ClaimItems(string id)
         {
             Console.WriteLine($"Claiming pending items");
-            var result = await Utils.ApiCall(async () => await _api.ActionClaimPendingItemMyNameActionClaimItemIdPostAsync(Name, id));
+            var result = await Utils.ApiCall(Name, async () => await _api.ActionClaimPendingItemMyNameActionClaimItemIdPostAsync(Name, id));
             var claim = result as ClaimPendingItemResponseSchema;
             return claim.Data;
         }

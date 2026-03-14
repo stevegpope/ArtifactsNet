@@ -8,16 +8,13 @@ namespace Artifacts
     internal static class Utils
     {
         public static Dictionary<string,CharacterSchema> Details = new Dictionary<string,CharacterSchema>();
-        public static BankSchema Bank { get; private set; }
-        public static double LastCooldown
-        {
-            get
-            {
-                return _cooldownManager.LastCooldown;
-            }
-        }
+        private static Dictionary<string, CooldownManager> _cooldowns = new Dictionary<string, CooldownManager>();
 
-        private static readonly CooldownManager _cooldownManager = new CooldownManager();
+        public static BankSchema Bank { get; private set; }
+        public static double LastCooldown(string name)
+        {
+            return _cooldowns[name].LastCooldown;
+        }
 
         internal static string ToJson<T>(
             this T obj
@@ -43,18 +40,29 @@ namespace Artifacts
 
             do
             { 
-                result = await ApiCall(call);
+                result = await ApiCall(null, call);
             }
             while (result == null);
 
             return result;
         }
 
-        internal static async Task<object> ApiCall(Func<Task<dynamic>> call)
+        internal static async Task<object> ApiCall(string name, Func<Task<dynamic>> call)
         {
+            CooldownManager cooldownManager = null;
+            if (name != null)
+            {
+                if (!_cooldowns.TryGetValue(name, out cooldownManager))
+                {
+                    cooldownManager = new CooldownManager();
+                    _cooldowns[name] = cooldownManager;
+                }
+                cooldownManager = _cooldowns[name];
+            }
+
             try
             {
-                await _cooldownManager.WaitForNextCall();
+                if (cooldownManager != null) await cooldownManager.WaitForNextCall();
 
                 var result = await call();
 
@@ -64,11 +72,11 @@ namespace Artifacts
                     {
                         if (cooldown is CooldownSchema cooldownSchema)
                         {
-                            await _cooldownManager.Cooldown(cooldownSchema.TotalSeconds);
+                            if (cooldownManager != null) await cooldownManager.Cooldown(cooldownSchema.TotalSeconds);
                         }
                         else if (cooldown is int cooldownValue)
                         {
-                            await _cooldownManager.Cooldown(cooldownValue);
+                            if (cooldownManager != null) await cooldownManager.Cooldown(cooldownValue);
                         }
                         else
                         {
@@ -107,21 +115,21 @@ namespace Artifacts
                 // Network error, wait a minute and try again
                 Console.WriteLine($"Network outage: {ex.Message}");
                 await Task.Delay(10 * 1000);
-                return await ApiCall(call);
+                return await ApiCall(name, call);
             }
             catch (ApiException ex)
             {
                 if (ex.ErrorCode == 499)
                 {
                     // Too fast, back off
-                    await _cooldownManager.BackOff(ex.ErrorContent.ToString());
+                    if (cooldownManager != null) await cooldownManager.BackOff(ex.ErrorContent.ToString());
 
-                    return await ApiCall(call);
+                    return await ApiCall(name, call);
                 }
                 else if (ex.ErrorCode == 486)
                 {
                     // An action is already in progress. Try again
-                    return await ApiCall(call);
+                    return await ApiCall(name, call);
                 }
                 else if (ex.ErrorCode == 502)
                 { 

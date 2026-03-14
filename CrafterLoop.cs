@@ -79,7 +79,7 @@ namespace Artifacts
                     await MakeJewels();
                     await NpcTrades();
 
-                    if (_random.Next(10) <= 1)
+                    if (_random.Next(10) <= 0 && Name != "baz1" && Name != "baz2")
                     {
                         await _character.PerformTask();
                     }
@@ -223,9 +223,9 @@ namespace Artifacts
                 if (taskComponent != null)
                 {
                     var bankItem = bankItems.FirstOrDefault(x => x.Code == taskComponent.Code);
-                    if (bankItem == null || bankItem.Quantity == 0)
+                    if (bankItem == null || bankItem.Quantity < taskComponent.Quantity)
                     {
-                        Console.WriteLine($"Filtering out {item.Code} because it needs {taskComponent.Code}");
+                        Console.WriteLine($"Filtering out {item.Code} because it needs {taskComponent.Code}, and we have none");
                     }
                     else
                     {
@@ -254,7 +254,7 @@ namespace Artifacts
                 if (component != null)
                 {
                     var bankItem = bankItems.FirstOrDefault(x => x.Code == component.Code);
-                    if (bankItem == null || bankItem.Quantity == 0)
+                    if (bankItem == null || bankItem.Quantity < component.Quantity)
                     {
                         Console.WriteLine($"Filtering out {item.Code} because it drops from a boss, and we have none");
                     }
@@ -286,6 +286,11 @@ namespace Artifacts
             foreach (var recipe in recipes)
             {
                 if (recipe.Craft.Items.Count != 1)
+                {
+                    continue;
+                }
+
+                if (recipe.Code.EndsWith("_bar"))
                 {
                     continue;
                 }
@@ -338,8 +343,8 @@ namespace Artifacts
         {
             var skillsPerCharacter = new Dictionary<string, string[]>
             {
-                { "baz1", new[] { "weaponcrafting", "alchemy" } },
-                { "baz2", new[] { "weaponcrafting", "alchemy" } },
+                { "baz1", new[] { "weaponcrafting" } },
+                { "baz2", new[] { "weaponcrafting" } },
                 { "baz3", new[] { "gearcrafting", "alchemy" } },
                 { "baz4", new[] { "gearcrafting", "alchemy" } },
                 { "baz5", new[] { "jewelrycrafting", "alchemy" } },
@@ -348,6 +353,14 @@ namespace Artifacts
             var skills = skillsPerCharacter[Name];
 
             var result = new List<string>();
+
+            // If the main skill (the first one) is a multiple of 10, focus on that one until we level up
+            var mainSkillLevel = _character.GetSkillLevel(skills[0]);
+            if (mainSkillLevel % 5 == 0)
+            {
+                Console.WriteLine($"Main skill {skills[0]} is at a multiple of 10 ({mainSkillLevel}), focusing on that");
+                return skills[0];
+            }
 
             // Eliminate skills that are 5 or more levels higher than all the others
             foreach (var skill in skills)
@@ -423,7 +436,7 @@ namespace Artifacts
                 return;
             }
 
-            if (monster.Level >= Utils.Details[Name].Level)
+            if (monster.Level >= Utils.Details[Name].Level - 5)
             {
                 Console.WriteLine($"{monster.Code} ({monster.Level}) is too high level for us ({Utils.Details[Name].Level})");
                 return;
@@ -494,9 +507,8 @@ namespace Artifacts
             var recipe = items.Values.FirstOrDefault(i => i.Craft != null && i.Craft.Items.Any(c => c.Code == itemDetails.Code));
             if (recipe != null)
             {
-                // Leave enough to craft 5 of something
                 var component = recipe.Craft.Items.First(c => c.Code == itemDetails.Code);
-                var amountToKeep = component.Quantity * 5;
+                var amountToKeep = component.Quantity * 25;
                 var amountToSell = Math.Min(currentAmount - amountToKeep, bankAmount);
                 Console.WriteLine($"Have {bankAmount} {itemDetails.Code}, recipes need it, sell {amountToSell}/{currentAmount}");
                 return amountToSell;
@@ -508,8 +520,7 @@ namespace Artifacts
                 var purchase = npc.Items.FirstOrDefault(i => i.Currency == itemDetails.Code && i.BuyPrice != null && i.BuyPrice.Value > 0);
                 if (purchase != null)
                 {
-                    // Keep enough to buy 5 of them
-                    var amountToKeep = purchase.BuyPrice.Value * 5;
+                    var amountToKeep = purchase.BuyPrice.Value * 25;
                     var amountToSell = Math.Min(currentAmount - amountToKeep, bankAmount);
                     Console.WriteLine($"Have {bankAmount} {itemDetails.Code}, NPCs need it, sell {amountToSell}/{currentAmount}");
                     return amountToSell;
@@ -578,7 +589,7 @@ namespace Artifacts
             var characters = await _character.GetAllCharacters();
             while (itemsList.Count != 0)
             {
-                var item = itemsList.ElementAt(_random.Next(itemsList.Count));
+                var item = ChooseEasiestItem(itemsList);
 
                 if (!ignoreBankCheck)
                 {
@@ -624,6 +635,46 @@ namespace Artifacts
                     
             var result = await CraftItemsAtLevel(targetLevel, craftAmount, newItems, bankItems, ignoreBankCheck: true);
             return new CraftResult(result.Code, result.Quantity, true);
+        }
+
+        private ItemSchema ChooseEasiestItem(List<ItemSchema> itemsList)
+        {
+            var easiestItem = itemsList[0];
+            var requiredLevel = CalculateRequiredLevel(easiestItem);
+            foreach(var item in itemsList)
+            {
+                if (item.Code == easiestItem.Code)
+                {
+                    continue;
+                }
+
+                var itemRequiredLevel = CalculateRequiredLevel(item);
+                if (itemRequiredLevel < requiredLevel)
+                {
+                    easiestItem = item;
+                    requiredLevel = itemRequiredLevel;
+                }
+            }
+
+            Console.WriteLine($"{easiestItem.Code} is easiest among\n {string.Join(',', itemsList.Select(i => i.Code))}");
+            return easiestItem;
+        }
+
+        private int CalculateRequiredLevel(ItemSchema easiestItem)
+        {
+            var monsters = Monsters.GetAllMonsters();
+            var requiredLevel = 0;
+
+            foreach(var item in easiestItem.Craft.Items)
+            {
+                var monster = monsters.Values.FirstOrDefault(m => m.Drops.Any(d => d.Code == item.Code));
+                if (monster != null)
+                {
+                    requiredLevel = Math.Max(requiredLevel, monster.Level);
+                }
+            }
+
+            return requiredLevel;
         }
 
         private bool IsMadeOfBaseResources(string code)
@@ -730,16 +781,17 @@ namespace Artifacts
                 limit = 10;
             }
 
+            var monsters = Monsters.GetAllMonsters();
             List<ItemSchema> comparables = new List<ItemSchema>();
             foreach (var otherBankItem in bankItems)
             {
-                var comparable = Items.GetItem(otherBankItem.Code);
-                if (comparable.Type != item.Type)
+                if (otherBankItem.Code == item.Code)
                 {
                     continue;
                 }
 
-                if (comparable.Code == item.Code)
+                var comparable = Items.GetItem(otherBankItem.Code);
+                if (comparable.Type != item.Type)
                 {
                     continue;
                 }
@@ -750,33 +802,58 @@ namespace Artifacts
                     continue;
                 }
 
-                if (comparable.Effects != null)
+                // Is the comparable better for every skill?
+                var skills = new[] { "crafting", "alchemy", "fishing", "woodcutting", "mining" };
+                var better = skills.All(skill => Items.CalculateItemValueSkill(item, skill) <= Items.CalculateItemValueSkill(comparable, skill));
+                if (!better)
                 {
-                    // Are the effects on the comparable better
-                    var better = true;
-                    foreach (var effect in item.Effects)
-                    {
-                        var comparableEffect = comparable.Effects.FirstOrDefault(x => x.Code == effect.Code);
-                        if (comparableEffect == null)
-                        {
-                            better = false;
-                            break;
-                        }
+                    continue;
+                }
 
-                        if (Math.Abs(comparableEffect.Value) < Math.Abs(effect.Value))
+                // Is the comparable better against every monster using every weapon type?
+                var weapons = new[]
+                {
+                    "copper_dagger", // air
+                    "wooden_staff", // earth
+                    "fishing_net", // water
+                    "fire_staff", // fire
+                };
+
+                foreach (var monster in monsters.Values)
+                {
+                    if (item.Type == "weapon")
+                    {
+                        var itemValue = Items.CalculateItemValue(item, monster, null, 500);
+                        var comparableValue = Items.CalculateItemValue(comparable, monster, null, 500);
+                        if (comparableValue < itemValue)
                         {
                             better = false;
                             break;
                         }
                     }
-
-                    if (better)
+                    else
                     {
-                        // All effects are better on the new item, we can get rid of all this one
-                        Console.WriteLine($"Recycle all {bankItem.Quantity} {bankItem.Code} because we have {bankItemAmount} {comparable.Code}");
-                        return bankItem.Quantity;
+                        foreach(var weapon in weapons)
+                        {
+                            var itemValue = Items.CalculateItemValue(item, monster, Items.GetItem(weapon), 500);
+                            var comparableValue = Items.CalculateItemValue(comparable, monster, Items.GetItem(weapon), 500);
+                            if (comparableValue < itemValue)
+                            {
+                                better = false;
+                                break;
+                            }
+                        }
                     }
                 }
+
+                if (!better)
+                {
+                    continue;
+                }
+
+                // All effects are better on the new item, we can get rid of all this one
+                Console.WriteLine($"Recycle all {bankItem.Quantity} {bankItem.Code} because we have {bankItemAmount} {comparable.Code}");
+                return bankItem.Quantity;
             }
 
             if (currentAmount > limit)

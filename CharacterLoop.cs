@@ -39,6 +39,12 @@ namespace Artifacts
                     await loop.RunAsync();
                     return;
                 }
+                else if (_role == "gatherer")
+                {
+                    var loop = new GathererLoop(_character);
+                    await loop.RunAsync();
+                    return;
+                }
                 else if (_role == "boss")
                 {
                     var loop = new BossLoop(_character);

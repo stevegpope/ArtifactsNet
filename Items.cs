@@ -187,11 +187,6 @@ namespace Artifacts
             value += GetResistanceValue(item, monster, estimatedRounds);
             value += GetAttackValueForMonster(item, monster, estimatedRounds);
 
-            if (value > 0)
-            {
-                Console.WriteLine($"{item.Code} {value} against {monster.Code}");
-            }
-
             return value;
         }
 
@@ -248,24 +243,22 @@ namespace Artifacts
 
         private static double GetAttackValueWithResistance(int resValue, ItemSchema item, int estimatedRounds, string element)
         {
-            // From the docs:
-            // Round(Attack * Round(Resistance * 0.01))
+            double attack = GetAttackValueForElement(item, element);
 
-            var attack = GetAttackValueForElement(item, element);
-            var res = 1.0;
-            if (resValue < 0)
+            // Convert resistance into a multiplier
+            // Example:
+            //  25  resistance  => 75% damage  (0.75)
+            // -25 resistance   => 125% damage (1.25)
+            double resMultiplier = 1.0;
+
+            if (resValue != 0)
             {
-                // Negative res value means this element is better
-                res = 1 + Math.Abs(resValue) * 0.01;
-            }
-            else if (resValue > 0)
-            {
-                // Positive res value means this element is resisted
-                res = resValue * 0.01;
+                resMultiplier = 1.0 - (resValue / 100.0);
             }
 
-            var result = attack * res;
-            return result * estimatedRounds;
+            resMultiplier = Math.Max(0.0, resMultiplier);
+
+            return attack * resMultiplier * estimatedRounds;
         }
 
         private static double GetAttackValueForElement(ItemSchema item, string element)

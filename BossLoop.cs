@@ -2,6 +2,7 @@
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
 using StackExchange.Redis;
+using System.Diagnostics;
 
 namespace Artifacts
 {
@@ -17,6 +18,7 @@ namespace Artifacts
         internal async Task RunAsync()
         {
             Console.WriteLine($"Starting boss loop");
+            const string boss = "king_slime";
 
             var characters = new[]
             {
@@ -34,15 +36,35 @@ namespace Artifacts
 
             // Top 3 fight, others support
             var topGuys = characters.OrderByDescending(x => Utils.Details[x.Name].Level);
+            var team = topGuys.Take(3);
 
-            const string boss = "king_slime";
-            var monster = Monsters.GetMonster(boss);
-
-            static async Task gearUp(Character character)
+            async Task gearUp(Character character)
             {
                 await character.DepositAllItems();
+                await character.GetFood();
+
+                var timer = Stopwatch.StartNew();
+                while (team.Any(t => !HasEnoughFood(t)))
+                {
+                    if (HasEnoughFood(character))
+                    {
+                        if (timer.Elapsed > TimeSpan.FromSeconds(120))
+                        {
+                            var recipe = await character.GatherFishAndCook(10);
+                            await character.DepositItem(recipe, 10);
+                        }
+                        else 
+                        {
+                            await Task.Delay(1000);
+                        }
+                    }
+                    else
+                    {
+                        await character.ChefRun(CountFood(character));
+                    }
+                }
+
                 await character.GearUpMonster(boss);
-                Console.WriteLine($"{character.Name} READY FOR {boss}");
             }
 
             var gearUpTasks = new List<Task>
@@ -52,26 +74,52 @@ namespace Artifacts
                 gearUp(topGuys.ElementAt(2)),
             };
 
-            var supportTasks = new List<Task>();
-            var potion = Items.GetItem("minor_health_potion");
-            foreach (var guy in topGuys.Skip(3))
+            static async Task makePotions(Character character)
             {
-                supportTasks.Add(Task.Run(async () => {
-                    while (true)
-                    {
-                        Console.WriteLine($"Support role loop {guy.Name}");
-                        await guy.DepositAllItems();
+                var monster = Monsters.GetMonster(boss);
+                while (true)
+                {
+                    Console.WriteLine($"Support role loop {character.Name}");
+                    await character.DepositAllItems();
 
-                        var slot = Random.Shared.Next(2) == 0 ? ItemSlot.Utility1 : ItemSlot.Utility2;
-                        ItemSchema weapon = ChooseWeapon();
-                        ItemSchema potion = guy.ChoosePotion(monster, slot, weapon);
-                        await guy.CraftItems(potion, 25);
-                    }
-                }));
+                    var slot = Random.Shared.Next(2) == 0 ? ItemSlot.Utility1 : ItemSlot.Utility2;
+                    ItemSchema weapon = ChooseWeapon();
+                    ItemSchema potion = character.ChoosePotion(monster, slot, weapon);
+                    //await character.CraftItems(potion, 25);
+                    await character.GatherFishAndCook(25);
+                }
             }
 
+            var supportTasks = new List<Task>
+            {
+                makePotions(topGuys.ElementAt(3)),
+                makePotions(topGuys.ElementAt(4)),
+            };
+
             await Task.WhenAll(gearUpTasks);
-            await BossFightLoop(topGuys.Take(3), boss);
+            await Task.WhenAll(BossFightLoop(team, boss), Task.WhenAll(supportTasks));
+        }
+
+        private static bool HasEnoughFood(Character character)
+        {
+            return CountFood(character) >= 50;
+        }
+
+        private static int CountFood(Character character)
+        {
+            var food = 0;
+            foreach(var item in Utils.Details[character.Name].Inventory)
+            {
+                if (string.IsNullOrEmpty(item.Code)) continue;
+
+                var itemDef = Items.GetItem(item.Code);
+                if (itemDef.Subtype == "food")
+                {
+                    food += item.Quantity;
+                }
+            }
+
+            return food;
         }
 
         private static ItemSchema ChooseWeapon()
@@ -80,91 +128,75 @@ namespace Artifacts
             return weapons.ElementAt(Random.Shared.Next(weapons.Count()));
         }
 
-        internal static async Task BossFightLoop(IEnumerable<Character> enumerable, string boss)
+        internal static async Task BossFightLoop(IEnumerable<Character> team, string boss)
         {
             Console.WriteLine("Boss Fight!");
 
-            var lostLastFight = 0;
-            var losses = 0;
+            var leader = team.ElementAt(2); // the one who triggers fight
+
+            int losses = 0;
 
             while (true)
             {
-                // If we are healthy enough fight right away
-                var tasks = new List<Task>();
-                foreach (var character in enumerable)
+                //
+                // PHASE 1: REST IF NEEDED
+                //
+                await Task.WhenAll(team.Select(async c =>
                 {
-                    var task = Task.Run(async () =>
+                    var stats = Utils.Details[c.Name];
+
+                    if (stats.Hp < stats.MaxHp * 0.75)
                     {
-                        var needsRest = false;
-                        if (lostLastFight == 0 && Utils.Details[character.Name].Hp < Utils.Details[character.Name].MaxXp * .75)
+                        if (await c.Rest())
                         {
-                            needsRest = true;
+                            Console.WriteLine($"{c.Name} rested");
                         }
-                        else if (Utils.Details[character.Name].Hp < lostLastFight)
-                        {
-                            needsRest |= true;
-                        }
+                    }
+                }));
 
-                        if (needsRest)
-                        {
-                            if (await character.Rest())
-                            {
-                                Console.WriteLine("We cooked food, gear up again");
-                                await character.GearUpMonster(boss);
-                            }
-                        }
+                //
+                // PHASE 2: MOVE TO BOSS
+                //
+                await Task.WhenAll(team.Select(c =>
+                    c.MoveTo(MapContentType.Monster, code: boss)));
 
-                        await character.MoveTo(MapContentType.Monster, code: boss);
-                    });
-
-                    tasks.Add(task);
-                }
-
-                await Task.WhenAll(tasks);
-
+                //
+                // PHASE 3: FIGHT
+                //
                 try
                 {
-                    var participants = new List<string>(enumerable.Take(2).Select(x => x.Name));
-                    var result = await enumerable.ElementAt(2).Fight(participants);
+                    var participants = team.Take(2).Select(x => x.Name).ToList();
+
+                    var result = await leader.Fight(participants);
 
                     if (result.Data.Fight.Result == FightResult.Win)
                     {
-                        // Reset losses, we can beat him!
                         losses = 0;
                     }
-                    else if (result.Data.Fight.Result == FightResult.Loss)
+                    else
                     {
-                        const int Limit = 3;
                         losses++;
-                        Console.WriteLine($"loss {losses}/{Limit}");
-                        if (losses >= Limit)
+
+                        Console.WriteLine($"loss {losses}/3");
+
+                        if (losses >= 3)
                         {
-                            Console.WriteLine($"We Lost! Giving up on monster {boss}");
+                            Console.WriteLine($"Giving up on {boss}");
                             return;
                         }
                     }
                 }
                 catch (ApiException ex)
                 {
-                    Console.WriteLine($"Fight error: {ex.ErrorContent}");
                     if (ex.ErrorCode == 497)
                     {
-                        Console.WriteLine("Inventory full, be right back");
-                        tasks.Clear();
-                        foreach (var character in enumerable)
-                        {
-                            var task = Task.Run(async () =>
-                            {
-                                await character.DepositAllItems();
-                            });
+                        Console.WriteLine("Inventory full, depositing");
 
-                            tasks.Add(task);
-                        }
-
-                        await Task.WhenAll(tasks);
+                        await Task.WhenAll(team.Select(c => c.DepositAllItems()));
                         continue;
                     }
 
+                    Console.WriteLine($"Fight error {ex.ErrorContent}");
                     return;
                 }
             }
