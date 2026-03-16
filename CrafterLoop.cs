@@ -10,7 +10,6 @@ namespace Artifacts
         private Character _character;
         private Random _random = Random.Shared;
         private string Name { get; set; }
-        private CurrentCraftManager _craftManager;
 
         internal class CraftResult
         {
@@ -37,7 +36,6 @@ namespace Artifacts
         {
             _character = character;
             Name = _character.Name;
-            _craftManager = new CurrentCraftManager(Name);
         }
 
         internal async Task RunAsync()
@@ -50,7 +48,7 @@ namespace Artifacts
                     await CheckForGold();
                     await ProcessEvents();
 
-                    var currentCraft = _craftManager.GetCurrentCraft();
+                    var currentCraft = _character.GetCurrentCraft();
                     if (currentCraft != null)
                     {
                         try
@@ -60,7 +58,7 @@ namespace Artifacts
                         }
                         finally
                         {
-                            _craftManager.FinishCraft();
+                            _character.FinishCraft();
                         }
                     }
                     else
@@ -436,7 +434,7 @@ namespace Artifacts
                 return;
             }
 
-            if (monster.Level >= Utils.Details[Name].Level - 5)
+            if (monster.Level >= Utils.Details[Name].Level - 10)
             {
                 Console.WriteLine($"{monster.Code} ({monster.Level}) is too high level for us ({Utils.Details[Name].Level})");
                 return;
@@ -605,7 +603,7 @@ namespace Artifacts
                     Console.WriteLine($"We will craft {item.Code}, current inventory {currentAmount}");
                 }
 
-                _craftManager.StartCraft(item.Code, craftAmount);
+                _character.StartCraft(item.Code, craftAmount);
 
                 try
                 {
@@ -622,7 +620,7 @@ namespace Artifacts
                 }
                 finally
                 {
-                    _craftManager.FinishCraft();
+                    _character.FinishCraft();
                 }
             }
 

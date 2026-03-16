@@ -1,7 +1,6 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
-using System.ComponentModel;
 
 namespace Artifacts
 {
@@ -11,6 +10,7 @@ namespace Artifacts
         private static readonly Random _random = Random.Shared;
         internal string Name { get; }
         private DateTime LastDeposit = DateTime.MinValue;
+        private CurrentCraftManager _craftManager;
 
         internal Character(
             Configuration config,
@@ -20,6 +20,7 @@ namespace Artifacts
         {
             _api = new MyCharactersApi(httpClient, config);
             Name = name;
+            _craftManager = new CurrentCraftManager(Name);
         }
 
         internal Character(
@@ -29,6 +30,7 @@ namespace Artifacts
         {
             _api = api;
             Name = name;
+            _craftManager = new CurrentCraftManager(Name);
         }
 
         internal async Task Init()
@@ -263,7 +265,8 @@ namespace Artifacts
             {
                 gathered = 0;
 
-                if (index > 0)
+                // Do not drop off non-components for sub-items. We need to keep them in inventory to craft the main item
+                if (index > 0 && item.Code == _craftManager.GetCurrentCraft()?.Code)
                 {
                     await DropOffNonComponents(item);
                 }
@@ -881,7 +884,7 @@ namespace Artifacts
                 return 0;
             }
 
-            if (monster.Level > Utils.Details[Name].Level)
+            if (monster.Level >= Utils.Details[Name].Level)
             {
                 Console.WriteLine($"We can't beat {monster.Code}, training");
                 await TrainFighting(monster.Level + 1);
@@ -894,7 +897,7 @@ namespace Artifacts
 
         internal async Task TrainFighting(int level)
         {
-            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 6);
+            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 4);
             var monsters = Monsters.Instance.GetMonsters(maxLevel).Where(x => x.Type != MonsterType.Boss);
             var fightList = monsters.OrderBy(x => x.Level).ToList();
             var lastXp = 0;
@@ -903,6 +906,12 @@ namespace Artifacts
             {
                 var monster = fightList.Last();
                 Console.WriteLine($"Train fighting with {monster.Code} from level {Utils.Details[Name].Level}/{level}");
+                var maps = await Map.Instance.GetMapLayer(MapContentType.Monster, monster.Code);
+                if (maps == null || !maps.Any())
+                {
+                    fightList.Remove(monster);
+                    continue;
+                }
 
                 await GearUpMonster(monster.Code);
 
@@ -1373,6 +1382,8 @@ namespace Artifacts
 
         internal async Task<int> WithdrawGold(int quantity)
         {
+            await MoveTo(MapContentType.Bank);
+
             try
             {
                 await Utils.ApiCall(Name, async () =>
@@ -1394,6 +1405,8 @@ namespace Artifacts
 
         internal async Task<int> WithdrawItems(string code, int quantity = 0)
         {
+            await MoveTo(MapContentType.Bank);
+
             var inventorySpace = GetFreeInventorySpace();
             Console.WriteLine($"Customer wants to withdraw {quantity} {code}. Free space {inventorySpace}");
 
@@ -1440,6 +1453,7 @@ namespace Artifacts
             Console.WriteLine($"Withdrew {withdrawQuantity} {code}");
             return withdrawQuantity;
         }
+
         internal int GetFreeInventorySpace()
         {
             var amount = Utils.Details[Name].InventoryMaxItems;
@@ -1800,6 +1814,8 @@ namespace Artifacts
                 return;
             }
 
+            Console.WriteLine($"Gear up for monster {monsterCode}");
+
             var monster = Monsters.GetMonster(monsterCode);
             var bankItems = await Bank.Instance.GetItems();
 
@@ -1807,19 +1823,19 @@ namespace Artifacts
             if (monster.Effects.Any(effect => effect.Code == "poison"))
             {
                 // Do not fight a venomous monster without antidote
-                if (!Utils.Details[Name].Utility2Slot.Contains("antidote") || Utils.Details[Name].Utility2SlotQuantity <= 0)
-                {
-                    var antidote = ChooseAntidote();
-                    var amount = await GatherItems(antidote, 25);
-                    if (amount > 0)
-                    {
-                        await Equip(antidote, ItemSlot.Utility2, 25);
-                    }
-                    else
-                    {
-                        throw new Exception($"Cannot make or gather {antidote}");
-                    }
-                }
+                //if (!Utils.Details[Name].Utility2Slot.Contains("antidote") || Utils.Details[Name].Utility2SlotQuantity <= 0)
+                //{
+                //    var antidote = ChooseAntidote();
+                //    var amount = await GatherItems(antidote, 25);
+                //    if (amount > 0)
+                //    {
+                //        await Equip(antidote, ItemSlot.Utility2, 25);
+                //    }
+                //    else
+                //    {
+                //        throw new Exception($"Cannot make or gather {antidote}");
+                //    }
+                //}
             }
            
 
@@ -1929,10 +1945,18 @@ namespace Artifacts
             // Save room, just in case of inventory issues
             var space = GetFreeInventorySpace() / 2;
             Console.WriteLine($"{quantity} food wanted, {space} space");
-            if (space <= 0)
+            if (space <= quantity)
             {
-                Console.WriteLine("No room for food!");
-                return 0;
+                Console.WriteLine("No room for food");
+                var craft = _craftManager.GetCurrentCraft();
+                if (craft != null)
+                {
+                    var item = Items.GetItem(craft.Code);
+                    await DropOffNonComponents(item);
+                    return 0;
+                }
+
+                return await GetFoodFromBank(quantity);
             }
 
             var found = 0;
@@ -2566,6 +2590,21 @@ namespace Artifacts
             {
                 await DepositAllItems();
             }
+        }
+
+        internal CurrentCraftManager.CraftInfo GetCurrentCraft()
+        {
+            return _craftManager.GetCurrentCraft();
+        }
+
+        internal void FinishCraft()
+        {
+            _craftManager.FinishCraft();
+        }
+
+        internal void StartCraft(string code, int craftAmount)
+        {
+            _craftManager.StartCraft(code, craftAmount);
         }
     }
 }
