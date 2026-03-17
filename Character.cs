@@ -480,7 +480,6 @@ namespace Artifacts
             {
                 if (item.Code == "tasks_coin" && item.Quantity >= 6)
                 {
-                    await MoveTo(MapContentType.Bank);
                     var amount = await WithdrawItems("tasks_coin");
                     if (amount >= 6)
                     {
@@ -611,8 +610,6 @@ namespace Artifacts
             {
                 return 0;
             }
-
-            await MoveTo(MapContentType.Bank);
 
             if (await WithdrawGold(gold) != gold)
             {
@@ -984,7 +981,6 @@ namespace Artifacts
                 if (gold >= total)
                 {
                     Console.WriteLine($"Withdraw {total} gold");
-                    await MoveTo(MapContentType.Bank);
                     return await WithdrawGold(total);
                 }
                 else
@@ -999,7 +995,6 @@ namespace Artifacts
             if (bankItemAmount > 0)
             {
                 Console.WriteLine($"{bankItemAmount} {code} in bank, get {total} of them");
-                await MoveTo(MapContentType.Bank);
                 var quantity = Math.Min(total, bankItemAmount);
                 return await WithdrawItems(code, quantity);
             }
@@ -1689,7 +1684,6 @@ namespace Artifacts
             {
                 Console.WriteLine($"Bank item {bestBankItem.Code} is highest value at {bankValue}");
                 // Best item is in the bank
-                await MoveTo(MapContentType.Bank);
                 if (await WithdrawItems(bestBankItem.Code, 1) > 0)
                 {
                     if (currentItem != null)
@@ -1957,8 +1951,6 @@ namespace Artifacts
                             return found;
                         }
 
-                        await MoveTo(MapContentType.Bank);
-
                         var withdrawn = await WithdrawItems(item.Code, amount);
                         if (withdrawn > 0)
                         {
@@ -2188,7 +2180,6 @@ namespace Artifacts
                     quantity = Math.Min(25, bankItem.Quantity);
                 }
 
-                await MoveTo(MapContentType.Bank);
                 var withdrawn = await WithdrawItems(bestBankItem.Code, quantity);
                 if (withdrawn > 0)
                 {

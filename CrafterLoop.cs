@@ -185,7 +185,6 @@ namespace Artifacts
                             var batch = Math.Min(purchaseQuantity, amount);
                             batch = Math.Min(batch, 25);
                             Console.WriteLine($"Buying {batch} {item.Code} from {npc.Code} for {batch * item.BuyPrice} {item.Currency}");
-                            await _character.MoveTo(MapContentType.Bank);
                             var withdrawn = await _character.WithdrawItems(item.Currency, batch * item.BuyPrice.Value);
                             if (withdrawn < batch * item.BuyPrice.Value)
                             {
@@ -467,7 +466,6 @@ namespace Artifacts
                     var amount = GetSellQuantity(itemDetails, bankItem.Quantity, characters, bankItems, npcs);
                     if (amount > 0)
                     {
-                        await _character.MoveTo(MapContentType.Bank);
                         var withdrawn = await _character.WithdrawItems(bankItem.Code);
                         if (withdrawn > 0)
                         {

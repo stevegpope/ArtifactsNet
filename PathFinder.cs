@@ -15,6 +15,7 @@ namespace Artifacts
 
         internal async Task<List<MapSchema>> GetPath(MapContentType contentType, string code = null)
         {
+            code = code?.ToLower();
             maps = await Map.Instance.GetAllMaps();
             var destinations = maps.Where(m => m?.Interactions?.Content?.Type == contentType && (code == null || m?.Interactions?.Content?.Code == code)).ToList();
             if (!destinations.Any())
