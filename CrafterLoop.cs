@@ -626,8 +626,7 @@ namespace Artifacts
 
             Console.WriteLine($"Already have enough items at this level, crafting without bank check");
 
-            // Remove anything that isn't made of resources
-            var newItems = items.Where(x => IsMadeOfBaseResources(x.Code)).ToList();
+            var newItems = items.Where(x => !RequiresTaskItems(x.Code)).ToList();
 
             await _character.DepositAllItems();
                     
@@ -675,16 +674,23 @@ namespace Artifacts
             return requiredLevel;
         }
 
-        private bool IsMadeOfBaseResources(string code)
+        private bool RequiresTaskItems(string code)
         {
             var item = Items.GetItem(code);
 
             if (item.Craft != null)
             {
-                return item.Craft.Items.All(c => IsMadeOfBaseResources(c.Code));
+                return item.Craft.Items.Any(c => RequiresTaskItems(c.Code));
             }
 
-            return item.Type == "resource" && item.Subtype != "task";
+            var monsters = Monsters.GetAllMonsters();
+            var bosses = monsters.Values.Where(m => m.Type == MonsterType.Boss);
+            var bossDrops = bosses.SelectMany(b => b.Drops);
+
+            var allItems = Items.GetAllItems();
+            var taskItems = allItems.Values.Where(i => i.Type == "resource" && i.Subtype == "task");
+
+            return bossDrops.Any(i => i.Code == code) || taskItems.Any(i => i.Code == code);
         }
 
         private static int CountAmountEverywhere(string code, List<CharacterSchema> characters, List<SimpleItemSchema> bankItems)
