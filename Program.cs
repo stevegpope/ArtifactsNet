@@ -55,6 +55,7 @@ namespace Artifacts
             Resources.Config(configuration, httpClient);
             await Resources.Instance.CacheItems();
             Bank.Config(configuration, httpClient);
+            Accounts.Config(configuration, httpClient);
 
             var character = new Character(
                 configuration,

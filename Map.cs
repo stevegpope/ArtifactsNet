@@ -40,6 +40,13 @@ namespace Artifacts
             _api = new MapsApi(httpClient, config);
         }
 
+        internal async Task<List<MapSchema>> GetAllMaps()
+        {
+            var mapSchema = await Utils.ApiCallGet(async () => await _api.GetAllMapsMapsGetAsync(size: 1000));
+            return (mapSchema as StaticDataPageMapSchema).Data;
+        }
+           
+
         internal async Task<List<MapSchema>> GetMapLayer(MapContentType contentType, string code = null, MapLayer layer = MapLayer.Overworld)
         {
             var mapSchema = await Utils.ApiCallGet(async () => await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code));

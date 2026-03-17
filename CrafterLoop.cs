@@ -77,7 +77,7 @@ namespace Artifacts
                     await MakeJewels();
                     await NpcTrades();
 
-                    if (_random.Next(10) <= 0 && Name != "baz1" && Name != "baz2")
+                    if (_random.Next(10) <= 0)
                     {
                         await _character.PerformTask();
                     }
@@ -145,7 +145,7 @@ namespace Artifacts
         {
             var npcs = Npcs.GetAllNpcs();
             var bankItems = await Bank.Instance.GetItems();
-            var characters = await _character.GetAllCharacters();
+            var characters = await _character.GetCharacters();
 
             foreach (var npc in npcs.Values)
             {
@@ -341,8 +341,8 @@ namespace Artifacts
         {
             var skillsPerCharacter = new Dictionary<string, string[]>
             {
-                { "baz1", new[] { "weaponcrafting" } },
-                { "baz2", new[] { "weaponcrafting" } },
+                { "baz1", new[] { "weaponcrafting", "alchemy" } },
+                { "baz2", new[] { "weaponcrafting", "alchemy" } },
                 { "baz3", new[] { "gearcrafting", "alchemy" } },
                 { "baz4", new[] { "gearcrafting", "alchemy" } },
                 { "baz5", new[] { "jewelrycrafting", "alchemy" } },
@@ -463,7 +463,7 @@ namespace Artifacts
                 if (bankItem != null)
                 {
                     bankItems = await Bank.Instance.GetItems();
-                    var characters = await _character.GetAllCharacters();
+                    var characters = await _character.GetCharacters();
                     var amount = GetSellQuantity(itemDetails, bankItem.Quantity, characters, bankItems, npcs);
                     if (amount > 0)
                     {
@@ -584,7 +584,7 @@ namespace Artifacts
             }
 
             var itemsList = new List<ItemSchema>(itemsAtLevel);
-            var characters = await _character.GetAllCharacters();
+            var characters = await _character.GetCharacters();
             while (itemsList.Count != 0)
             {
                 var item = ChooseEasiestItem(itemsList);
@@ -721,7 +721,7 @@ namespace Artifacts
         {
             // If there are too many of this item, try to recycle some
             var bankItems = await Bank.Instance.GetItems();
-            var characters = await _character.GetAllCharacters();
+            var characters = await _character.GetCharacters();
             foreach (var bankItem in bankItems)
             {
                 var recycleQuantity = await CalculateRecycleQuantity(bankItems, characters, bankItem);
@@ -736,7 +736,7 @@ namespace Artifacts
                             var item = Items.GetItem(bankItem.Code);
 
                             // Go to relevant workshop
-                            await _character.MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
+                            await _character.MoveTo(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
 
                             await _character.Recycle(item.Code, recycleQuantity);
 

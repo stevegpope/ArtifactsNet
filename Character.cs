@@ -40,12 +40,6 @@ namespace Artifacts
             Utils.Details[Name] = character;
         }
 
-        internal async Task<List<CharacterSchema>> GetAllCharacters()
-        {
-            var response = await _api.GetMyCharactersMyCharactersGetAsync();
-            return response.Data;
-        }
-
         internal async Task Move(int x, int y)
         {
             if (x == Utils.Details[Name].X && y == Utils.Details[Name].Y)
@@ -91,33 +85,30 @@ namespace Artifacts
         internal async Task MoveTo(MapContentType locationType, string code = null)
         {
             Console.WriteLine($"Moving {Name} to {locationType}, code {code}");
-            var response = await Map.Instance.GetMapLayer(locationType, code);
-            if (response == null)
+            var pathfinder = new PathFinder(Utils.Details[Name]);
+            var path = await pathfinder.GetPath(locationType, code);
+            if (path == null || path.Count == 0)
             {
                 throw new Exception($"No locations found for type {locationType} and code {code}");
             }
 
-            if (response != null && response.Count != 0)
+            while(path.Count() > 1)
             {
-                while(true)
-                {
-                    MapSchema location = GetClosest(response);
-                    try
-                    {
-                        await Move(location.X, location.Y);
-                        break;
-                    }
-                    catch (ApiException ex)
-                    {
-                        Console.WriteLine($"Can't go to {location.X}, {location.Y}: {ex.ErrorContent}");
-                        response.Remove(location);
-                    }
-                }
+                var location = path.First();
+                await Move(location.X, location.Y);
+                await TransitionToNewLayer();
+                path.Remove(location);
             }
-            else
+
+            var finalLocation = path.First();
+            await Move(finalLocation.X, finalLocation.Y);
+        }
+        private async Task TransitionToNewLayer()
+        {
+            await Utils.ApiCall(Name, async () =>
             {
-                throw new Exception($"No locations found for type {locationType}");
-            }
+                return await _api.ActionTransitionMyNameActionTransitionPostAsync(Name);
+            });
         }
 
         internal async Task TurnInItems(string code, int quantity)
@@ -212,7 +203,7 @@ namespace Artifacts
             }
 
             // Go to the crafting location
-            await MoveClosest(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
+            await MoveTo(MapContentType.Workshop, item.Craft.Skill.Value.ToString());
 
             var quantity = CalculateCraftQuantity(item.Craft, craftQuantity);
 
@@ -530,21 +521,6 @@ namespace Artifacts
             return quantity - 1;
         }
 
-        internal async Task MoveClosest(MapContentType contentType, string code)
-        {
-            Console.WriteLine($"Moving to closest {code} for character {Name}");
-            var response = await Map.Instance.GetMapLayer(contentType, code);
-            if (response != null && response.Count != 0)
-            {
-                var location = GetClosest(response);
-                await Move(location.X, location.Y);
-            }
-            else
-            {
-                throw new Exception($"No locations found for type {contentType} and code {code}");
-            }
-        }
-
         internal async Task<int> GatherItems(string code, int total, bool ignoreBank = false, bool bankOnly = false, ItemSchema doNotUse = null)
         {
             Console.WriteLine($"Gather {total} {code}");
@@ -818,7 +794,7 @@ namespace Artifacts
                 }
             }
 
-            await MoveClosest(MapContentType.Resource, resource.Code);
+            await MoveTo(MapContentType.Resource, resource.Code);
 
             var gathered = 0;
             var leftToGet = remaining - gathered;
@@ -916,7 +892,8 @@ namespace Artifacts
                 await GearUpMonster(monster.Code);
 
                 var losses = 0;
-                for (int index = 0; index < 25; index++)
+                var fights = 0;
+                while (Utils.Details[Name].Level < level)
                 {
                     // If we are healthy enough fight right away
                     var needsRest = Utils.Details[Name].Hp < Utils.Details[Name].MaxHp * .6;
@@ -943,7 +920,7 @@ namespace Artifacts
 
                     try
                     {
-                        Console.WriteLine($"Training run {index + 1}/25");
+                        Console.WriteLine($"Training run {fights++ + 1}");
 
                         var hp = Utils.Details[Name].Hp;
                         var result = await Fight();
@@ -1704,7 +1681,7 @@ namespace Artifacts
             {
                 Console.WriteLine($"Inventory item {bestInventoryItem.Code} is highest value at {inventoryValue}");
                 if (currentItem != null)
-                    await Unequip(slotType);
+                    await UnequipAndDeposit(slotType);
 
                 await Equip(bestInventoryItem.Code, slotType);
             }
@@ -1716,7 +1693,7 @@ namespace Artifacts
                 if (await WithdrawItems(bestBankItem.Code, 1) > 0)
                 {
                     if (currentItem != null)
-                        await Unequip(slotType);
+                        await UnequipAndDeposit(slotType);
 
                     await Equip(bestBankItem.Code, slotType);
                 }
@@ -2174,11 +2151,7 @@ namespace Artifacts
                             quantity = Utils.Details[Name].Utility2SlotQuantity;
                         }
 
-                        var response = await Unequip(slotType);
-                        if (response != null)
-                        {
-                            await DepositItem(response.Data.Item.Code, quantity);
-                        }
+                        await UnequipAndDeposit(slotType, quantity);
                     }
                 }
 
@@ -2196,7 +2169,7 @@ namespace Artifacts
                 Console.WriteLine($"Inventory item {bestInventoryItem.Code} is highest value at {inventoryValue} in {slotType}");
                 if (currentItem != null)
                 {
-                    await Unequip(slotType);
+                    await UnequipAndDeposit(slotType);
                 }
 
                 await Equip(bestInventoryItem.Code, slotType);
@@ -2220,7 +2193,9 @@ namespace Artifacts
                 if (withdrawn > 0)
                 {
                     if (currentItem != null)
-                        await Unequip(slotType);
+                    {
+                        await UnequipAndDeposit(slotType);
+                    }
 
                     await Equip(bestBankItem.Code, slotType, withdrawn);
                 }
@@ -2235,7 +2210,16 @@ namespace Artifacts
             }
         }
 
-        private bool MeetsConditions(List<ConditionSchema> conditions)
+        private async Task UnequipAndDeposit(ItemSlot slotType, int quantity = 1)
+        {
+            var response = await Unequip(slotType);
+            if (response != null)
+            {
+                await DepositItem(response.Data.Item.Code, quantity);
+            }
+        }
+
+        internal bool MeetsConditions(List<ConditionSchema> conditions)
         {
             if (conditions == null || conditions.Count == 0)
             {
@@ -2530,10 +2514,24 @@ namespace Artifacts
         {
             Console.WriteLine($"Recycling {recycleQuantity} {code}");
 
-            await Utils.ApiCall(Name, async () =>
+            try
             {
-                return await _api.ActionRecyclingMyNameActionRecyclingPostAsync(Name, new RecyclingSchema(code, recycleQuantity));
-            });
+                await Utils.ApiCall(Name, async () =>
+                {
+                    return await _api.ActionRecyclingMyNameActionRecyclingPostAsync(Name, new RecyclingSchema(code, recycleQuantity));
+                });
+            }
+            catch(ApiException ex)
+            {
+                Console.WriteLine($"Error recycling: {ex.ErrorContent}");
+                if (ex.ErrorCode == 478)
+                {
+                    Console.WriteLine($"Missing items to recycle {code}");
+                    return;
+                }
+
+                throw;
+            }
         }
 
         internal async Task SellNpc(string code, int quantity)

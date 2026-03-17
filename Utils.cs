@@ -13,7 +13,12 @@ namespace Artifacts
         public static BankSchema Bank { get; private set; }
         public static double LastCooldown(string name)
         {
-            return _cooldowns[name].LastCooldown;
+            if (_cooldowns.TryGetValue(name, out CooldownManager cooldownManager))
+            {
+                return cooldownManager.LastCooldown;
+            }
+
+            return 0;
         }
 
         internal static string ToJson<T>(
