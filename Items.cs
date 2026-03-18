@@ -127,6 +127,11 @@ namespace Artifacts
 
         internal static double CalculateItemValue(ItemSchema item, MonsterSchema monster, ItemSchema weapon, int maxLevel)
         {
+            if (item == null)
+            {
+                return 0;
+            }
+
             if (item.Effects == null || item.Effects.Count == 0)
             {
                 return 0;
@@ -328,6 +333,26 @@ namespace Artifacts
                 ItemSlot.Rune => "rune" == type,
                 ItemSlot.Shield => "shield" == type,
                 ItemSlot.Utility1 or ItemSlot.Utility2 => "utility" == type,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        internal static ItemSlot GetItemSlot(string type)
+        {
+            return type switch
+            {
+                "weapon" => ItemSlot.Weapon,
+                "boots" => ItemSlot.Boots,
+                "artifact" => ItemSlot.Artifact1,
+                "amulet" => ItemSlot.Amulet,
+                "bag" => ItemSlot.Bag,
+                "body_armor" => ItemSlot.BodyArmor,
+                "helmet" => ItemSlot.Helmet,
+                "leg_armor" => ItemSlot.LegArmor,
+                "ring" => ItemSlot.Ring1,
+                "rune" => ItemSlot.Rune,
+                "shield" => ItemSlot.Shield,
+                "utility" => ItemSlot.Utility1,
                 _ => throw new NotImplementedException(),
             };
         }

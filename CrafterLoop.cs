@@ -44,6 +44,10 @@ namespace Artifacts
             {
                 try
                 {
+                    // TEMP
+                    await DeleteStuff();
+                    await Recycle();
+
                     Console.WriteLine($"Starting crafter loop");
                     await CheckForGold();
                     await ProcessEvents();
@@ -133,10 +137,41 @@ namespace Artifacts
 
                     // Recycle leftovers
                     await Recycle();
+
+                    // Clean up things we no longer need
+                    await DeleteStuff();
                 }
                 catch (Exception ex)
                 {
                     File.AppendAllText("errors.txt", $"[{DateTime.UtcNow}] {ex}\n");
+                }
+            }
+        }
+
+        private async Task DeleteStuff()
+        {
+            var bankItems = await Bank.Instance.GetItems();
+            var characters = await _character.GetCharacters();
+            var items = Items.GetAllItems().Values;
+
+            var minCharacterLevel = characters.Min(x => x.Level);
+
+            foreach (var bankItem in bankItems)
+            {
+                var item = Items.GetItem(bankItem.Code);
+                var recipes = items.Where(i => i.Craft != null && i.Craft.Items.Any(c => c.Code == bankItem.Code));
+                if (!recipes.Any()) continue;
+
+                if (recipes.Any(r => r.Level > minCharacterLevel - 15))
+                {
+                    continue;
+                }
+
+                Console.WriteLine($"All low level recipes, deleting {bankItem.Quantity} {bankItem.Code}");
+                var amount = await _character.WithdrawItems(bankItem.Code);
+                if (amount > 0)
+                {
+                    await _character.DeleteItem(bankItem.Code, amount);
                 }
             }
         }
@@ -760,7 +795,7 @@ namespace Artifacts
             }
         }
 
-        private static async Task<int> CalculateRecycleQuantity(List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, SimpleItemSchema bankItem)
+        private async Task<int> CalculateRecycleQuantity(List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, SimpleItemSchema bankItem)
         {
             // If there are 5 of a better item in every way we can recycle all of them, if not we need to keep 5
             var item = Items.GetItem(bankItem.Code);
@@ -784,87 +819,170 @@ namespace Artifacts
             }
 
             var monsters = Monsters.GetAllMonsters();
-            List<ItemSchema> comparables = new List<ItemSchema>();
-            foreach (var otherBankItem in bankItems)
+            var keep = WouldChooseItemSkill(item, bankItems, characters, limit);
+            if (!keep)
             {
-                if (otherBankItem.Code == item.Code)
-                {
-                    continue;
-                }
-
-                var comparable = Items.GetItem(otherBankItem.Code);
-                if (comparable.Type != item.Type)
-                {
-                    continue;
-                }
-
-                var bankItemAmount = CountAmountEverywhere(otherBankItem.Code, characters, bankItems);
-                if (bankItemAmount < limit)
-                {
-                    continue;
-                }
-
-                // Is the comparable better for every skill?
-                var skills = new[] { "crafting", "alchemy", "fishing", "woodcutting", "mining" };
-                var better = skills.All(skill => Items.CalculateItemValueSkill(item, skill) <= Items.CalculateItemValueSkill(comparable, skill));
-                if (!better)
-                {
-                    continue;
-                }
-
-                // Is the comparable better against every monster using every weapon type?
-                var weapons = new[]
-                {
-                    "copper_dagger", // air
-                    "wooden_staff", // earth
-                    "fishing_net", // water
-                    "fire_staff", // fire
-                };
-
                 foreach (var monster in monsters.Values)
                 {
-                    if (item.Type == "weapon")
+                    if (WouldChooseItem(item, monster, bankItems, characters, limit))
                     {
-                        var itemValue = Items.CalculateItemValue(item, monster, null, 500);
-                        var comparableValue = Items.CalculateItemValue(comparable, monster, null, 500);
-                        if (comparableValue < itemValue)
-                        {
-                            better = false;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        foreach(var weapon in weapons)
-                        {
-                            var itemValue = Items.CalculateItemValue(item, monster, Items.GetItem(weapon), 500);
-                            var comparableValue = Items.CalculateItemValue(comparable, monster, Items.GetItem(weapon), 500);
-                            if (comparableValue < itemValue)
-                            {
-                                better = false;
-                                break;
-                            }
-                        }
+                        keep = true;
+                        break;
                     }
                 }
+            }
 
-                if (!better)
+            if (keep)
+            {
+                if (currentAmount > limit)
+                {
+                    Console.WriteLine($"Recycle {currentAmount - limit} {bankItem.Code} because we have {currentAmount}");
+                    return currentAmount - limit;
+                }
+
+                return 0;
+            }
+            
+            Console.WriteLine($"Recycle all {bankItem.Quantity} {bankItem.Code} because we have better gear");
+            return currentAmount;
+        }
+
+        private bool WouldChooseItemSkill(ItemSchema item, List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, int limit)
+        {
+            // Crafting values
+            var skills = Enum.GetNames(typeof(CraftSkill));
+            foreach (var skill in skills)
+            {
+                var itemValue = Items.CalculateItemValueSkill(item, skill.ToLower());
+                if (itemValue == 0) continue;
+
+                var bankItem = GetBestItemSkill(skill.ToLower(), bankItems, bankItems, characters, limit);
+                var bankValue = Items.CalculateItemValueSkill(bankItem, skill.ToLower());
+                if (bankValue > itemValue)
                 {
                     continue;
                 }
 
-                // All effects are better on the new item, we can get rid of all this one
-                Console.WriteLine($"Recycle all {bankItem.Quantity} {bankItem.Code} because we have {bankItemAmount} {comparable.Code}");
-                return bankItem.Quantity;
+                var inventoryItems = Utils.Details[Name].Inventory.Where(i => i.Quantity > 0).Select(i => new SimpleItemSchema(i.Code, i.Quantity));
+                var inventoryItem = GetBestItemSkill(skill.ToLower(), inventoryItems, bankItems, characters, limit);
+                var inventoryValue = Items.CalculateItemValueSkill(bankItem, skill.ToLower());
+                if (inventoryValue > itemValue)
+                {
+                    continue;
+                }
+
+                return true;
             }
 
-            if (currentAmount > limit)
+            return false;
+        }
+
+        private bool WouldChooseItem(ItemSchema item, MonsterSchema monster, List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, int limit)
+        {
+            int maxLevel = Utils.Details[Name].Level;
+
+            if (item.Subtype == "tool")
             {
-                Console.WriteLine($"Recycle {currentAmount - limit} {bankItem.Code} because we have {currentAmount}");
-                return currentAmount - limit;
+                return true;
+            }
+            else
+            {
+                if(!IsBestItem(item.Type, monster, bankItems, bankItems, characters, limit, item))
+                {
+                    return false;
+                }
+
+                var inventoryItems = Utils.Details[Name].Inventory.Where(i => i.Quantity > 0).Select(i => new SimpleItemSchema(i.Code, i.Quantity));
+                if(!IsBestItem(item.Type, monster, inventoryItems, bankItems, characters, limit, item))
+                {
+                    return false;
+                }
+
+                return true;
+            }
+        }
+
+        private ItemSchema GetBestItemSkill(string skill, IEnumerable<SimpleItemSchema> items, List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, int limit)
+        {
+            int maxLevel = Utils.Details[Name].Level;
+            double bestValue = 0.0;
+            ItemSchema bestItem = null;
+
+            foreach (var bankItem in items)
+            {
+                var itemSchema = Items.GetItem(bankItem.Code);
+
+                if (itemSchema.Subtype != "tool") continue;
+
+                var amount = CountAmountEverywhere(bankItem.Code, characters, bankItems);
+                if (amount < limit) continue;
+
+                var itemValue = Items.CalculateItemValueSkill(itemSchema, skill);
+                if (itemValue > bestValue)
+                {
+                    bestValue = itemValue;
+                    bestItem = itemSchema;
+                }
             }
 
-            return 0;
+            return bestItem;
+        }
+
+        private bool IsBestItem(string type, MonsterSchema monster, IEnumerable<SimpleItemSchema> items, List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, int limit, ItemSchema compare)
+        {
+            int maxLevel = Utils.Details[Name].Level;
+
+            var weapons = new[]
+            {
+                "copper_dagger", // air
+                "wooden_staff", // earth
+                "fishing_net", // water
+                "fire_staff", // fire
+            };
+
+            return bankItems.Any(b => ChooseBestItemForMonster(type, monster, bankItems, characters, limit, compare, maxLevel, weapons, b)?.Code == compare.Code);
+        }
+
+        private static ItemSchema ChooseBestItemForMonster(string type, MonsterSchema monster, List<SimpleItemSchema> bankItems, List<CharacterSchema> characters, int limit, ItemSchema compare, int maxLevel, string[] weapons, SimpleItemSchema bankItem)
+        {
+            var itemSchema = Items.GetItem(bankItem.Code);
+
+            if (itemSchema.Type != type) return null;
+
+            var amount = CountAmountEverywhere(bankItem.Code, characters, bankItems);
+            if (amount < limit) return null;
+
+            if (type == "weapon")
+            {
+                var compareValue = Items.CalculateItemValue(compare, monster, null, maxLevel);
+                var itemValue = Items.CalculateItemValue(itemSchema, monster, null, maxLevel);
+                if (itemValue > compareValue)
+                {
+                    return itemSchema;
+                }
+            }
+            else
+            {
+                var better = true;
+                foreach (var weapon in weapons)
+                {
+                    var weaponSchema = Items.GetItem(weapon);
+                    var compareValue = Items.CalculateItemValue(compare, monster, weaponSchema, maxLevel);
+                    var itemValue = Items.CalculateItemValue(itemSchema, monster, weaponSchema, maxLevel);
+                    if (itemValue > compareValue)
+                    {
+                        better = false;
+                        break;
+                    }
+                }
+
+                if (better)
+                {
+                    return itemSchema;
+                }
+            }
+
+            return compare;
         }
     }
 }

@@ -2118,10 +2118,10 @@ namespace Artifacts
                 currentValue = Items.CalculateItemValue(currentItem, monster, weapon, Utils.Details[Name].Level);
             }
 
-            var bestInventoryItem = await GetBestItemFromInventory(slotType, monster, weapon);
+            var bestInventoryItem = GetBestItemFromInventory(slotType, monster, weapon);
             var inventoryValue = bestInventoryItem != null ? Items.CalculateItemValue(bestInventoryItem, monster, weapon, Utils.Details[Name].Level) : 0;
 
-            var bestBankItem = await GetBestItemFromBank(slotType, monster, bankItems, weapon);
+            var bestBankItem = GetBestItemFromBank(slotType, monster, bankItems, weapon);
             var bankValue = bestBankItem != null ? Items.CalculateItemValue(bestBankItem, monster, weapon, Utils.Details[Name].Level) : 0;
 
             var max = Math.Max(currentValue, Math.Max(bankValue, inventoryValue));
@@ -2282,7 +2282,7 @@ namespace Artifacts
             throw new ArgumentException($"Cannot choose potion for slot {slotType}");
         }
 
-        private async Task<ItemSchema> GetBestItemFromBank(ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon)
+        internal ItemSchema GetBestItemFromBank(ItemSlot slotType, MonsterSchema monster, List<SimpleItemSchema> bankItems, ItemSchema weapon)
         {
             ItemSchema bestItem = null;
             foreach (var bankItem in bankItems)
@@ -2314,7 +2314,7 @@ namespace Artifacts
             return bestItem;
         }
 
-        private async Task<ItemSchema> GetBestItemFromInventory(ItemSlot slotType, MonsterSchema monster, ItemSchema weapon)
+        internal ItemSchema GetBestItemFromInventory(ItemSlot slotType, MonsterSchema monster, ItemSchema weapon)
         {
             ItemSchema bestItem = null;
             foreach (var inventoryItem in Utils.Details[Name].Inventory)
@@ -2594,6 +2594,22 @@ namespace Artifacts
         internal void StartCraft(string code, int craftAmount)
         {
             _craftManager.StartCraft(code, craftAmount);
+        }
+
+        internal async Task DeleteItem(string code, int amount)
+        {
+            try
+            {
+                await Utils.ApiCall(Name, async () =>
+                {
+                    Console.WriteLine($"Delete {amount} {code}");
+                    return await _api.ActionDeleteItemMyNameActionDeletePostAsync(Name, new SimpleItemSchema(code, amount));
+                });
+            }
+            catch(ApiException ex)
+            {
+                Console.WriteLine($"Error deleting item {ex.ErrorContent}");
+            }
         }
     }
 }
