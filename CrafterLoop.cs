@@ -684,8 +684,9 @@ namespace Artifacts
 
         private ItemSchema ChooseEasiestItem(List<ItemSchema> itemsList)
         {
+            // Pick the item with the least number of components
             var easiestItem = itemsList[0];
-            var requiredLevel = CalculateRequiredLevel(easiestItem);
+            var requiredComponents = CountComponents(easiestItem);
             foreach(var item in itemsList)
             {
                 if (item.Code == easiestItem.Code)
@@ -693,11 +694,11 @@ namespace Artifacts
                     continue;
                 }
 
-                var itemRequiredLevel = CalculateRequiredLevel(item);
-                if (itemRequiredLevel < requiredLevel)
+                var itemRequiredComponents = CountComponents(item);
+                if (itemRequiredComponents < requiredComponents)
                 {
                     easiestItem = item;
-                    requiredLevel = itemRequiredLevel;
+                    requiredComponents = itemRequiredComponents;
                 }
             }
 
@@ -705,21 +706,24 @@ namespace Artifacts
             return easiestItem;
         }
 
-        private int CalculateRequiredLevel(ItemSchema easiestItem)
+        private int CountComponents(ItemSchema item)
         {
-            var monsters = Monsters.GetAllMonsters();
-            var requiredLevel = 0;
+            var components = 0;
 
-            foreach(var item in easiestItem.Craft.Items)
+            foreach(var component in item.Craft.Items)
             {
-                var monster = monsters.Values.FirstOrDefault(m => m.Drops.Any(d => d.Code == item.Code));
-                if (monster != null)
+                var componentItem = Items.GetItem(component.Code);
+                if (componentItem.Craft != null)
                 {
-                    requiredLevel = Math.Max(requiredLevel, monster.Level);
+                    components += component.Quantity * CountComponents(componentItem);
+                }
+                else
+                {
+                    components += component.Quantity;
                 }
             }
 
-            return requiredLevel;
+            return components;
         }
 
         private bool RequiresTaskItems(string code)

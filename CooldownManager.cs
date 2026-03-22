@@ -97,7 +97,13 @@ namespace Artifacts
                 ? double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)
                 : 0;
 
-            return result;
+            if (result > 0)
+            {
+                return result;
+            }
+
+            // Rate limit exceeded, wait a couple minutes
+            return 120;
         }
     }
 }

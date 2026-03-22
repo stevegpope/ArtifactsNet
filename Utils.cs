@@ -127,7 +127,14 @@ namespace Artifacts
                 if (ex.ErrorCode == 499)
                 {
                     // Too fast, back off
-                    if (cooldownManager != null) await cooldownManager.BackOff(ex.ErrorContent.ToString());
+                    if (cooldownManager != null)
+                    {
+                        await cooldownManager.BackOff(ex.ErrorContent.ToString());
+                    }
+                    else
+                    {
+                        await Task.Delay(10000);
+                    }
 
                     return await ApiCall(name, call);
                 }
@@ -136,13 +143,14 @@ namespace Artifacts
                     // An action is already in progress. Try again
                     return await ApiCall(name, call);
                 }
-                else if (ex.ErrorCode == 502)
-                { 
-                    Console.WriteLine($"{ex.ErrorContent}, usually this worked");
-                    return null;
+                else if (ex.ErrorCode == 502 || ex.ErrorCode == 429 || ex.ErrorCode == 502 || ex.ErrorCode == 503 || ex.ErrorCode == 520)
+                {
+                    Console.WriteLine($"Bad call: {ex.ErrorContent}, code {ex.ErrorCode}");
+                    await Task.Delay(10000);
+                    return await ApiCall(name, call);
                 }
 
-                Console.WriteLine($"API call failed: {ex.ErrorContent}, code  {ex.ErrorCode}");
+                Console.WriteLine($"API call failed: {ex.ErrorContent}, code {ex.ErrorCode}");
                 throw;
             }
         }
