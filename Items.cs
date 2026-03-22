@@ -67,7 +67,7 @@ namespace Artifacts
                     }
 
                     pageNum++;
-                    if (pageNum == page.Pages)
+                    if (pageNum > page.Pages)
                     {
                         break;
                     }

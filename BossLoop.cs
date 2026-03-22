@@ -65,6 +65,7 @@ namespace Artifacts
                 }
 
                 await character.GearUpMonster(boss);
+                Console.WriteLine($"{character.Name} ready for boss");
             }
 
             var gearUpTasks = new List<Task>

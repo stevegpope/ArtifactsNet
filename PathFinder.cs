@@ -6,6 +6,7 @@ namespace Artifacts
     {
         private readonly CharacterSchema character;
         private List<MapSchema> maps;
+        private DateTime LastUpdate = DateTime.MinValue;
         private List<AccountAchievementSchema> achievements = null;
 
         internal PathFinder(CharacterSchema characterSchema)
@@ -16,7 +17,7 @@ namespace Artifacts
         internal async Task<List<MapSchema>> GetPath(MapContentType contentType, string code = null)
         {
             code = code?.ToLower();
-            maps = await Map.Instance.GetAllMaps();
+            maps = await GetMaps();
             var destinations = maps.Where(m => m?.Interactions?.Content?.Type == contentType && (code == null || m?.Interactions?.Content?.Code == code)).ToList();
             if (!destinations.Any())
             {
@@ -24,6 +25,18 @@ namespace Artifacts
             }
 
             return FindShortestPath(destinations);
+        }
+
+        private async Task<List<MapSchema>> GetMaps()
+        {
+            // Cache the map for 10 minutes. Events will be affected
+            if (LastUpdate < DateTime.UtcNow - TimeSpan.FromMinutes(10))
+            {
+                LastUpdate = DateTime.UtcNow;
+                maps = await Map.Instance.GetAllMaps();
+            }
+
+            return maps;
         }
 
         private List<MapSchema> FindShortestPath(List<MapSchema> destinations)

@@ -212,10 +212,10 @@ namespace Artifacts
                 await Utils.ApiCall(Name, async () =>
                 {
                     Console.WriteLine($"Craft {quantity} {item.Code}");
-                    var levelBefore = GetSkillLevel(item.Craft.Skill.ToString());
                     var response = await _api.ActionCraftingMyNameActionCraftingPostAsync(Name, new CraftingSchema(item.Code, quantity));
-                    var levelAfter = GetSkillLevel(item.Craft.Skill.ToString());
-                    Console.WriteLine($"{Name} Xp: {response.Data.Details.Xp} level {levelBefore}/{levelAfter}");
+                    var xp = GetSkillXp(item.Craft.Skill.ToString());
+                    var maxXp = GetSkillMaxXp(item.Craft.Skill.ToString());
+                    Console.WriteLine($"{Name} {item.Craft.Skill.ToString()} {response.Data.Details.Xp} Xp: {xp}/{maxXp}");
                     Console.WriteLine($"{Name} crafted {quantity} {item.Code}");
                     return response;
                 });
@@ -811,8 +811,9 @@ namespace Artifacts
                     if (result == null) continue;
 
                     var schema = result as SkillResponseSchema;
-                    var levelAfter = GetSkillLevel(skill);
-                    Console.WriteLine($"XP: {schema.Data.Details.Xp} level {levelBefore}/{levelAfter}");
+                    var xp = GetSkillXp(skill);
+                    var maxXp = GetSkillMaxXp(skill);
+                    Console.WriteLine($"{Name} {skill} {schema.Data.Details.Xp} Xp: {xp}/{maxXp}");
                     foreach (var drop in schema.Data.Details.Items)
                     {
                         Console.WriteLine($"drop: {drop.Quantity} {drop.Code}");
@@ -837,6 +838,11 @@ namespace Artifacts
 
                         Console.WriteLine($"Back from training, gathering {leftToGet} {item.Code}");
                         return await GatherResources(doNotUse, remaining, item, resource);
+                    }
+                    else if (ex.ErrorCode == 598)
+                    {
+                        Console.WriteLine($"Resource is no longer present. We're done");
+                        return gathered;
                     }
 
                     throw;
@@ -870,7 +876,7 @@ namespace Artifacts
 
         internal async Task TrainFighting(int level)
         {
-            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 4);
+            var maxLevel = Math.Max(1, Utils.Details[Name].Level - 3);
             var monsters = Monsters.Instance.GetMonsters(maxLevel).Where(x => x.Type != MonsterType.Boss);
             var fightList = monsters.OrderBy(x => x.Level).ToList();
             var lastXp = 0;
@@ -1459,11 +1465,11 @@ namespace Artifacts
                     }
                 }
 
-                // Assume we are not at the monster
-                await MoveTo(MapContentType.Monster, code: monster);
-
                 try
                 {
+                    // Assume we are not at the monster
+                    await MoveTo(MapContentType.Monster, code: monster);
+
                     var hp = Utils.Details[Name].Hp;
                     var result = await Fight();
                     if (result.Data.Fight.Result == FightResult.Win)
@@ -1496,6 +1502,11 @@ namespace Artifacts
                         continue;
                     }
 
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in fight loop: {ex.Message}");
                     return;
                 }
             }
@@ -1607,7 +1618,7 @@ namespace Artifacts
                 Console.WriteLine($"Fight {response.Data.Fight.Result}");
                 foreach (var characterResponse in response.Data.Fight.Characters)
                 {
-                    Console.WriteLine($"XP: {characterResponse.Xp}");
+                    Console.WriteLine($"{characterResponse.Xp} XP: {Utils.Details[Name].Xp}/{Utils.Details[Name].MaxXp}");
                     if (characterResponse.Drops != null)
                     {
                         foreach (var drop in characterResponse.Drops)
@@ -1872,6 +1883,38 @@ namespace Artifacts
             };
         }
 
+        internal int GetSkillXp(string skill)
+        {
+            return skill.ToLower() switch
+            {
+                "weaponcrafting" => Utils.Details[Name].WeaponcraftingXp,
+                "gearcrafting" => Utils.Details[Name].GearcraftingXp,
+                "jewelrycrafting" => Utils.Details[Name].JewelrycraftingXp,
+                "cooking" => Utils.Details[Name].CookingXp,
+                "alchemy" => Utils.Details[Name].AlchemyXp,
+                "woodcutting" => Utils.Details[Name].WoodcuttingXp,
+                "mining" => Utils.Details[Name].MiningXp,
+                "fishing" => Utils.Details[Name].FishingXp,
+                _ => throw new Exception($"Unexpected skill {skill}"),
+            };
+        }
+
+        internal int GetSkillMaxXp(string skill)
+        {
+            return skill.ToLower() switch
+            {
+                "weaponcrafting" => Utils.Details[Name].WeaponcraftingMaxXp,
+                "gearcrafting" => Utils.Details[Name].GearcraftingMaxXp,
+                "jewelrycrafting" => Utils.Details[Name].JewelrycraftingMaxXp,
+                "cooking" => Utils.Details[Name].CookingMaxXp,
+                "alchemy" => Utils.Details[Name].AlchemyMaxXp,
+                "woodcutting" => Utils.Details[Name].WoodcuttingMaxXp,
+                "mining" => Utils.Details[Name].MiningMaxXp,
+                "fishing" => Utils.Details[Name].FishingMaxXp,
+                _ => throw new Exception($"Unexpected skill {skill}"),
+            };
+        }
+
         internal async Task<bool> GetFood()
         {
             const int Threshold = 50;
@@ -1925,6 +1968,10 @@ namespace Artifacts
                     var item = Items.GetItem(craft.Code);
                     await DropOffNonComponents(item);
                     return 0;
+                }
+                else
+                {
+                    await DepositAllItems();
                 }
 
                 return await GetFoodFromBank(quantity);

@@ -42,7 +42,7 @@ namespace Artifacts
 
         internal async Task<List<MapSchema>> GetAllMaps()
         {
-            var mapSchema = await Utils.ApiCallGet(async () => await _api.GetAllMapsMapsGetAsync(size: 1000));
+            var mapSchema = await Utils.ApiCallGet(async () => await _api.GetAllMapsMapsGetAsync(size: 10000));
             return (mapSchema as StaticDataPageMapSchema).Data;
         }
            

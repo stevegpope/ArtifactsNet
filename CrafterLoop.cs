@@ -44,13 +44,7 @@ namespace Artifacts
             {
                 try
                 {
-                    // TEMP
-                    await DeleteStuff();
-                    await Recycle();
-
                     Console.WriteLine($"Starting crafter loop");
-                    await CheckForGold();
-                    await ProcessEvents();
 
                     var currentCraft = _character.GetCurrentCraft();
                     if (currentCraft != null)
@@ -72,17 +66,21 @@ namespace Artifacts
 
                     // Start at the bank with no inventory
                     await _character.DepositAllItems();
+                    await CheckForGold();
+                    await ProcessEvents();
 
                     if (!string.IsNullOrEmpty(Utils.Details[Name].Task))
                     {
+                        Console.WriteLine($"Continue task {Utils.Details[Name].Task}");
                         await _character.PerformTask();
                     }
 
                     await MakeJewels();
                     await NpcTrades();
 
-                    if (_random.Next(10) <= 0)
+                    if (_random.Next(10) <= 1)
                     {
+                        Console.WriteLine($"Find new random task");
                         await _character.PerformTask();
                     }
 
@@ -159,7 +157,7 @@ namespace Artifacts
             foreach (var bankItem in bankItems)
             {
                 var item = Items.GetItem(bankItem.Code);
-                var recipes = items.Where(i => i.Craft != null && i.Craft.Items.Any(c => c.Code == bankItem.Code));
+                var recipes = items.Where(i => i.Craft != null && i.Craft.Skill != CraftSkill.Cooking && i.Craft.Items.Any(c => c.Code == bankItem.Code));
                 if (!recipes.Any()) continue;
 
                 if (recipes.Any(r => r.Level > minCharacterLevel - 15))
@@ -184,7 +182,7 @@ namespace Artifacts
 
             foreach (var npc in npcs.Values)
             {
-                foreach(var item in npc.Items)
+                foreach (var item in npc.Items)
                 {
                     if (item.Currency == "gold" || item.Currency == "tasks_coin")
                     {
@@ -194,7 +192,25 @@ namespace Artifacts
                     if (item.BuyPrice == null || item.BuyPrice.Value <= 0)
                     {
                         // We are buying, not selling
-                        continue; 
+                        continue;
+                    }
+
+                    var itemDef = Items.GetItem(item.Code);
+                    if (itemDef.Effects == null || !itemDef.Effects.Any())
+                    {
+                        // No effect, we don't want it
+                        continue;
+                    }
+
+                    if (itemDef.Type == "consumable")
+                    {
+                        // Nothing temporary
+                        continue;
+                    }
+
+                    if (itemDef.Subtype == "potion")
+                    {
+                        continue;
                     }
 
                     var bankItem = bankItems.FirstOrDefault(x => x.Code == item.Currency);
@@ -202,7 +218,6 @@ namespace Artifacts
                     {
                         var purchaseQuantity = bankItem.Quantity / item.BuyPrice.Value;
 
-                        var itemDef = Items.GetItem(item.Code);
                         if (itemDef.Effects != null && itemDef.Effects.Count > 0)
                         {
                             var currentAmount = CountAmountEverywhere(item.Code, characters, bankItems);
@@ -468,7 +483,7 @@ namespace Artifacts
                 return;
             }
 
-            if (monster.Level >= Utils.Details[Name].Level - 10)
+            if (monster.Level > Utils.Details[Name].Level - 8)
             {
                 Console.WriteLine($"{monster.Code} ({monster.Level}) is too high level for us ({Utils.Details[Name].Level})");
                 return;
