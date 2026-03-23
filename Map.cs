@@ -1,6 +1,7 @@
 ﻿using ArtifactsMmoClient.Api;
 using ArtifactsMmoClient.Client;
 using ArtifactsMmoClient.Model;
+using System.Net.WebSockets;
 using System.Threading.Tasks;
 
 namespace Artifacts
@@ -10,6 +11,8 @@ namespace Artifacts
         private MapsApi _api;
         private static Configuration _config;
         private static HttpClient _httpClient;
+        private List<MapSchema> maps;
+        private DateTime LastUpdate = DateTime.MinValue;
 
         internal static Map Instance => lazy.Value;
 
@@ -42,21 +45,34 @@ namespace Artifacts
 
         internal async Task<List<MapSchema>> GetAllMaps()
         {
-            var mapSchema = await Utils.ApiCallGet(async () => await _api.GetAllMapsMapsGetAsync(size: 10000));
-            return (mapSchema as StaticDataPageMapSchema).Data;
+            // Cache the map for 5 minutes
+            if (maps == null || LastUpdate < DateTime.UtcNow - TimeSpan.FromMinutes(5))
+            {
+                LastUpdate = DateTime.UtcNow;
+                var mapSchema = await Utils.ApiCallGet(async () => await _api.GetAllMapsMapsGetAsync(size: 10000));
+                maps = (mapSchema as StaticDataPageMapSchema).Data;
+            }
+
+            return maps;
         }
            
 
         internal async Task<List<MapSchema>> GetMapLayer(MapContentType contentType, string code = null, MapLayer layer = MapLayer.Overworld)
         {
-            var mapSchema = await Utils.ApiCallGet(async () => await _api.GetLayerMapsMapsLayerGetAsync(layer, contentType, code));
-            return (mapSchema as StaticDataPageMapSchema).Data;
+            var maps = await GetAllMaps();
+            var content = maps.Where(m => m?.Interactions?.Content?.Type == contentType);
+            if (code != null)
+            {
+                content = content.Where(m => m?.Interactions?.Content?.Code == code);
+            }
+
+            return content.Where(m => m.Layer == layer).ToList();
         }
 
         internal async Task<MapSchema> GetMapPosition(int x, int y, MapLayer layer = MapLayer.Overworld)
         {
-            var mapResponseSchema = await Utils.ApiCallGet(async () => await _api.GetMapByPositionMapsLayerXYGetAsync(layer, x, y));
-            return (mapResponseSchema as MapResponseSchema).Data;
+            var maps = await GetAllMaps();
+            return maps.FirstOrDefault(m => m.X == x && m.Y == y && m.Layer == layer);
         }
     }
 }

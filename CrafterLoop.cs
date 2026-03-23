@@ -78,7 +78,7 @@ namespace Artifacts
                     await MakeJewels();
                     await NpcTrades();
 
-                    if (_random.Next(10) <= 1)
+                    if (_random.Next(10) <= 2)
                     {
                         Console.WriteLine($"Find new random task");
                         await _character.PerformTask();
@@ -684,21 +684,20 @@ namespace Artifacts
 
         private ItemSchema ChooseEasiestItem(List<ItemSchema> itemsList)
         {
-            // Pick the item with the least number of components
             var easiestItem = itemsList[0];
-            var requiredComponents = CountComponents(easiestItem);
-            foreach(var item in itemsList)
+            var requiredLevel = CalculateRequiredLevel(easiestItem);
+            foreach (var item in itemsList)
             {
                 if (item.Code == easiestItem.Code)
                 {
                     continue;
                 }
 
-                var itemRequiredComponents = CountComponents(item);
-                if (itemRequiredComponents < requiredComponents)
+                var itemRequiredLevel = CalculateRequiredLevel(item);
+                if (itemRequiredLevel < requiredLevel)
                 {
                     easiestItem = item;
-                    requiredComponents = itemRequiredComponents;
+                    requiredLevel = itemRequiredLevel;
                 }
             }
 
@@ -706,24 +705,21 @@ namespace Artifacts
             return easiestItem;
         }
 
-        private int CountComponents(ItemSchema item)
+        private int CalculateRequiredLevel(ItemSchema easiestItem)
         {
-            var components = 0;
+            var monsters = Monsters.GetAllMonsters();
+            var requiredLevel = 0;
 
-            foreach(var component in item.Craft.Items)
+            foreach (var item in easiestItem.Craft.Items)
             {
-                var componentItem = Items.GetItem(component.Code);
-                if (componentItem.Craft != null)
+                var monster = monsters.Values.FirstOrDefault(m => m.Drops.Any(d => d.Code == item.Code));
+                if (monster != null)
                 {
-                    components += component.Quantity * CountComponents(componentItem);
-                }
-                else
-                {
-                    components += component.Quantity;
+                    requiredLevel = Math.Max(requiredLevel, monster.Level);
                 }
             }
 
-            return components;
+            return requiredLevel;
         }
 
         private bool RequiresTaskItems(string code)
