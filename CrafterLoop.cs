@@ -684,22 +684,23 @@ namespace Artifacts
 
         private ItemSchema ChooseEasiestItem(List<ItemSchema> itemsList)
         {
-            var easiestItem = itemsList[0];
-            var requiredLevel = CalculateRequiredLevel(easiestItem);
-            foreach (var item in itemsList)
-            {
-                if (item.Code == easiestItem.Code)
-                {
-                    continue;
-                }
+            var easiestItem = itemsList.ElementAt(Random.Shared.Next(0, itemsList.Count));
+            //var easiestItem = itemsList[0];
+            //var requiredLevel = CalculateRequiredLevel(easiestItem);
+            //foreach (var item in itemsList)
+            //{
+            //    if (item.Code == easiestItem.Code)
+            //    {
+            //        continue;
+            //    }
 
-                var itemRequiredLevel = CalculateRequiredLevel(item);
-                if (itemRequiredLevel < requiredLevel)
-                {
-                    easiestItem = item;
-                    requiredLevel = itemRequiredLevel;
-                }
-            }
+            //    var itemRequiredLevel = CalculateRequiredLevel(item);
+            //    if (itemRequiredLevel < requiredLevel)
+            //    {
+            //        easiestItem = item;
+            //        requiredLevel = itemRequiredLevel;
+            //    }
+            //}
 
             Console.WriteLine($"{easiestItem.Code} is easiest among\n {string.Join(',', itemsList.Select(i => i.Code))}");
             return easiestItem;

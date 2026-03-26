@@ -183,7 +183,9 @@ namespace Artifacts
                 else if (condition.Operator == ConditionOperator.AchievementUnlocked)
                 {
                     if (achievements == null)
+                    {
                         achievements = Accounts.Instance.GetAchievements().Result;
+                    }
 
                     if (!achievements.Any(a => a.Code == condition.Code)) return false;
                 }

@@ -80,7 +80,6 @@ namespace Artifacts
 
         internal async Task<string> GetResourceSkill(ItemSchema item)
         {
-            await CacheItems();
             foreach(var cacheItem in _cache.Values)
             {
                 if (item.Code ==  cacheItem.Code)

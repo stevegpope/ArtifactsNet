@@ -103,21 +103,23 @@ namespace Artifacts
             var finalLocation = path.First();
             await Move(finalLocation.X, finalLocation.Y);
         }
+
         private async Task TransitionToNewLayer()
         {
             await Utils.ApiCall(Name, async () =>
             {
+                Console.WriteLine("Transition to new layer");
                 return await _api.ActionTransitionMyNameActionTransitionPostAsync(Name);
             });
         }
 
         internal async Task TurnInItems(string code, int quantity)
         {
-            Console.WriteLine($"Turning in {quantity} {code} for character {Name}");
             try
             {
                 await Utils.ApiCall(Name, async () =>
                 {
+                    Console.WriteLine($"Turning in {quantity} {code} for character {Name}");
                     var item = new SimpleItemSchema(code, quantity);
                     return await _api.ActionTaskTradeMyNameActionTaskTradePostAsync(Name, item);
                 });
@@ -145,9 +147,6 @@ namespace Artifacts
         internal async Task<int> CraftItems(ItemSchema item, int remaining, bool bankOnly = false, bool ignoreBank = false)
         {
             Console.WriteLine($"Crafting {remaining} {item.Code} for character {Name}, bankOnly {bankOnly}, ignoreBank {ignoreBank}");
-            Console.WriteLine($"{item.Code}: {remaining}");
-            Console.WriteLine($"{item.Code}: {remaining}");
-            Console.WriteLine($"{item.Code}: {remaining}");
             item.PrintCraftComponents();
 
             var minSkillLevel = item.Craft.Level;
@@ -185,7 +184,7 @@ namespace Artifacts
             {
                 try
                 {
-                    await GearUpSkill("crafting", null);
+                    await GearUpSkill("crafting");
                 }
                 catch (ApiException ex)
                 {
@@ -193,7 +192,7 @@ namespace Artifacts
                     {
                         Console.WriteLine("Inventory full, cannot gear up");
                         await DropOffNonComponents(item);
-                        await GearUpSkill("crafting", null);
+                        await GearUpSkill("crafting");
                     }
                     else
                     {
@@ -520,7 +519,7 @@ namespace Artifacts
             return quantity - 1;
         }
 
-        internal async Task<int> GatherItems(string code, int total, bool ignoreBank = false, bool bankOnly = false, ItemSchema doNotUse = null)
+        internal async Task<int> GatherItems(string code, int total, bool ignoreBank = false, bool bankOnly = false)
         {
             Console.WriteLine($"Gather {total} {code}");
             var withdrawn = 0;
@@ -566,7 +565,7 @@ namespace Artifacts
             var resource = await Resources.Instance.GetResourceDrop(code);
             if (resource != null)
             {
-                var gathered = await GatherResources(doNotUse, remaining, item, resource);
+                var gathered = await GatherResources(remaining, item, resource);
                 return gathered + withdrawn;
             }
 
@@ -768,14 +767,14 @@ namespace Artifacts
             return bought;
         }
 
-        private async Task<int> GatherResources(ItemSchema doNotUse, int remaining, ItemSchema item, ResourceSchema resource)
+        private async Task<int> GatherResources(int remaining, ItemSchema item, ResourceSchema resource)
         {
             Console.WriteLine($"Gathering {remaining} {item.Code} for character {Name}");
             var skill = await Resources.Instance.GetResourceSkill(item);
 
             try
             { 
-                await GearUpSkill(skill, doNotUse);
+                await GearUpSkill(skill);
             }
             catch (ApiException ex)
             {
@@ -783,7 +782,7 @@ namespace Artifacts
                 {
                     Console.WriteLine("Inventory full, cannot gear up");
                     await DropOffNonComponents(item);
-                    await GearUpSkill("crafting", null);
+                    await GearUpSkill("crafting");
                 }
                 else
                 {
@@ -837,7 +836,7 @@ namespace Artifacts
                         await TrainSkill(skill, item.Level);
 
                         Console.WriteLine($"Back from training, gathering {leftToGet} {item.Code}");
-                        return await GatherResources(doNotUse, remaining, item, resource);
+                        return await GatherResources(remaining, item, resource);
                     }
                     else if (ex.ErrorCode == 598)
                     {
@@ -1008,20 +1007,20 @@ namespace Artifacts
             return 0;
         }
 
-        private async Task TrainSkill(string skill, int levelGoal, ItemSchema doNotUse = null)
+        private async Task TrainSkill(string skill, int levelGoal)
         {
             var currentLevel = GetSkillLevel(skill);
             Console.WriteLine($"Train {skill} from {currentLevel} to {levelGoal}");
 
             while (currentLevel < levelGoal)
             {
-                await TrainGathering(currentLevel, skill, doNotUse);
+                await TrainGathering(currentLevel, skill);
                 currentLevel = GetSkillLevel(skill);
                 Console.WriteLine($"Training at {currentLevel}/{levelGoal}");
             }
         }
 
-        internal async Task TrainGathering(int level, string skill, ItemSchema doNotUse = null)
+        internal async Task TrainGathering(int level, string skill)
         {
             Console.WriteLine($"Train {skill} at level {level}");
             var items = Items.GetAllItems();
@@ -1052,7 +1051,7 @@ namespace Artifacts
                         }
                     }
 
-                    total = await GatherItems(item, 50, ignoreBank: true, bankOnly: false, doNotUse);
+                    total = await GatherItems(item, 50, ignoreBank: true, bankOnly: false);
                     if (total == 0)
                     {
                         itemsList.Remove(selectedItem);
@@ -1115,18 +1114,10 @@ namespace Artifacts
                     return drops;
                 }
 
-                // If this is a boss fight we will wait until there are 3 characters present before we fight.
-                // While checking for events, we also check to see if any characters are waiting at a boss.
-                List<string> participants = null;
-                if (monsterSchema.Type == MonsterType.Boss)
-                {
-                    participants = await WaitForBackup(Name);
-                }
-
                 try
                 {
                     var hp = Utils.Details[Name].Hp;
-                    var result = await Fight(participants);
+                    var result = await Fight();
                     if (result == null) continue;
 
                     lostLastFight = hp - Utils.Details[Name].Hp;
@@ -1175,45 +1166,6 @@ namespace Artifacts
             }
 
             return drops;
-        }
-
-        private async Task<List<string>> WaitForBackup(string name)
-        {
-            var participants = new HashSet<string>();
-            var waited = 0;
-            while(true)
-            {
-                var characters = await GetCharacters();
-                foreach (var character in characters)
-                {
-                    if (character.Name == name)
-                    {
-                        continue;
-                    }
-
-                    if (character.X == Utils.Details[Name].X &&
-                        character.Y == Utils.Details[Name].Y &&
-                        character.Layer == Utils.Details[Name].Layer)
-                    {
-                        participants.Add(character.Name);
-                    }
-                    else
-                    {
-                        participants.Remove(character.Name);
-                    }
-
-                    if (participants.Count >= 2)
-                    {
-                        Console.WriteLine($"Returning first 2 of participants: {string.Join(',', participants)}");
-                        return participants.Take(2).ToList();
-                    }
-                }
-
-                Console.WriteLine($"Wait 10/{waited}s so far for boss");
-                Console.WriteLine($"Present so far: {string.Join(',', participants)}");
-                waited += 10;
-                await Task.Delay(10000);
-            }
         }
 
         internal async Task<List<CharacterSchema>> GetCharacters()
@@ -1387,6 +1339,10 @@ namespace Artifacts
 
             var inventorySpace = GetFreeInventorySpace();
             Console.WriteLine($"Customer wants to withdraw {quantity} {code}. Free space {inventorySpace}");
+            if (inventorySpace == 0)
+            {
+                throw new Exception($"Not allowed to withdraw when we have no space");
+            }
 
             var bankItems = await Bank.Instance.GetItems();
 
@@ -1634,7 +1590,7 @@ namespace Artifacts
             return (CharacterFightResponseSchema)result;
         }
 
-        internal async Task GearUpSkill(string skill, ItemSchema doNotUse)
+        internal async Task GearUpSkill(string skill)
         {
             Console.WriteLine($"Gear up for {skill}");
 
@@ -1644,23 +1600,23 @@ namespace Artifacts
             }
 
             var bankItems = await Bank.Instance.GetItems();
-            await EquipBestForSkill(Utils.Details[Name].WeaponSlot, ItemSlot.Weapon, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].ShieldSlot, ItemSlot.Shield, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].HelmetSlot, ItemSlot.Helmet, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].BodyArmorSlot, ItemSlot.BodyArmor, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].LegArmorSlot, ItemSlot.LegArmor, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].BootsSlot, ItemSlot.Boots, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].Ring1Slot, ItemSlot.Ring1, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].Ring2Slot, ItemSlot.Ring2, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].AmuletSlot, ItemSlot.Amulet, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].Artifact1Slot, ItemSlot.Artifact1, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].Artifact2Slot, ItemSlot.Artifact2, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].Artifact3Slot, ItemSlot.Artifact3, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].BagSlot, ItemSlot.Bag, skill, bankItems, doNotUse);
-            await EquipBestForSkill(Utils.Details[Name].RuneSlot, ItemSlot.Rune, skill, bankItems, doNotUse);
+            await EquipBestForSkill(Utils.Details[Name].WeaponSlot, ItemSlot.Weapon, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].ShieldSlot, ItemSlot.Shield, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].HelmetSlot, ItemSlot.Helmet, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].BodyArmorSlot, ItemSlot.BodyArmor, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].LegArmorSlot, ItemSlot.LegArmor, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].BootsSlot, ItemSlot.Boots, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].Ring1Slot, ItemSlot.Ring1, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].Ring2Slot, ItemSlot.Ring2, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].AmuletSlot, ItemSlot.Amulet, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].Artifact1Slot, ItemSlot.Artifact1, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].Artifact2Slot, ItemSlot.Artifact2, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].Artifact3Slot, ItemSlot.Artifact3, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].BagSlot, ItemSlot.Bag, skill, bankItems);
+            await EquipBestForSkill(Utils.Details[Name].RuneSlot, ItemSlot.Rune, skill, bankItems);
         }
 
-        private async Task EquipBestForSkill(string currentEquipped, ItemSlot slotType, string skill, List<SimpleItemSchema> bankItems, ItemSchema doNotUse)
+        private async Task EquipBestForSkill(string currentEquipped, ItemSlot slotType, string skill, List<SimpleItemSchema> bankItems)
         {
             ItemSchema currentItem = null;
             var currentValue = 0.0;
@@ -1670,10 +1626,10 @@ namespace Artifacts
                 currentValue = Items.CalculateItemValueSkill(currentItem, skill);
             }
 
-            var bestInventoryItem = GetBestItemFromInventorySkill(slotType, skill, doNotUse);
+            var bestInventoryItem = GetBestItemFromInventorySkill(slotType, skill);
             var inventoryValue = bestInventoryItem != null ? Items.CalculateItemValueSkill(bestInventoryItem, skill) : 0;
 
-            var bestBankItem = GetBestItemFromBankSkill(slotType, skill, bankItems, doNotUse);
+            var bestBankItem = GetBestItemFromBankSkill(slotType, skill, bankItems);
             var bankValue = bestBankItem != null ? Items.CalculateItemValueSkill(bestBankItem, skill) : 0;
 
             var max = Math.Max(currentValue, Math.Max(bankValue, inventoryValue));
@@ -1705,21 +1661,16 @@ namespace Artifacts
                 else
                 {
                     bankItems = await Bank.Instance.GetItems();
-                    await EquipBestForSkill(currentEquipped, slotType, skill, bankItems, doNotUse);
+                    await EquipBestForSkill(currentEquipped, slotType, skill, bankItems);
                 }
             }
         }
 
-        private ItemSchema GetBestItemFromBankSkill(ItemSlot slotType, string skill, List<SimpleItemSchema> bankItems, ItemSchema doNotUse)
+        private ItemSchema GetBestItemFromBankSkill(ItemSlot slotType, string skill, List<SimpleItemSchema> bankItems)
         {
             ItemSchema bestItem = null;
             foreach (var bankItem in bankItems)
             {
-                if (doNotUse != null && doNotUse.Code == bankItem.Code)
-                {
-                    continue;
-                }
-
                 var item = Items.GetItem(bankItem.Code);
                 if (!MeetsConditions(item.Conditions))
                 {
@@ -1747,17 +1698,12 @@ namespace Artifacts
             return bestItem;
         }
 
-        private ItemSchema GetBestItemFromInventorySkill(ItemSlot slotType, string skill, ItemSchema doNotUse)
+        private ItemSchema GetBestItemFromInventorySkill(ItemSlot slotType, string skill)
         {
             ItemSchema bestItem = null;
             foreach (var inventoryItem in Utils.Details[Name].Inventory)
             {
                 if (string.IsNullOrEmpty(inventoryItem.Code))
-                {
-                    continue;
-                }
-
-                if (doNotUse != null && inventoryItem.Code == doNotUse.Code)
                 {
                     continue;
                 }
@@ -2495,56 +2441,8 @@ namespace Artifacts
             }
             catch (ApiException ex)
             {
-                if (ex.ErrorCode == 496)
-                {
-                    var item = Items.GetItem(code);
-                    foreach (var condition in item.Conditions)
-                    {
-                        await MeetCondition(condition, item);
-                    }
-                    return;
-                }
-
                 Console.WriteLine($"Equip error: {ex.ErrorContent}");
                 throw;
-            }
-        }
-
-        private async Task MeetCondition(ConditionSchema condition, ItemSchema item)
-        {
-            string skill = null;
-            switch(condition.Code)
-            {
-                case "fishing_level":
-                    skill = "fishing";
-                    break;
-                case "mining_level":
-                    skill = "mining";
-                    break;
-                case "woodcutting_level":
-                    skill = "woodcutting";
-                    break;
-                case "cooking_level":
-                    skill = "cooking";
-                    break;
-                case "alchemy_level":
-                    skill = "alchemy";
-                    break;
-            }
-
-            if (skill != null)
-            {
-                var level = condition.Value;
-                if (condition.Operator == ConditionOperator.Gt)
-                {
-                    level++;
-                }
-
-                await TrainSkill(skill, level, doNotUse: item);
-            }
-            else
-            {
-                Console.WriteLine($"Unknown skill for condition {condition}");
             }
         }
 
