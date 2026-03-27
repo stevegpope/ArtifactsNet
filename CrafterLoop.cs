@@ -109,6 +109,10 @@ namespace Artifacts
                     var items = await Items.Instance.GetItems(skill: craftSkill, minLevel: 0, maxLevel: level);
                     var bankItems = await Bank.Instance.GetItems();
 
+                    // Filter out items retrieved from event monsters
+                    var events = await Events.Instance.GetAllEvents();
+                    items = FilterEventItems(items, bankItems, events);
+
                     // Filter out items retrieved from bosses
                     items = FilterBossItems(items, bankItems);
 
@@ -144,6 +148,44 @@ namespace Artifacts
                     File.AppendAllText("errors.txt", $"[{DateTime.UtcNow}] {ex}\n");
                 }
             }
+        }
+
+        private List<ItemSchema> FilterEventItems(List<ItemSchema> items, List<SimpleItemSchema> bankItems, List<EventSchema> events)
+        {
+            var result = new List<ItemSchema>();
+
+            // Get monster drops
+            var monsters = Monsters.GetAllMonsters();
+            var monstersFromEvents = events.Where(e => e?.Content?.Type == MapContentType.Monster).Select(e => monsters[e.Content.Code]);
+            var monsterEventDrops = monstersFromEvents.SelectMany(m => m.Drops.Select(d => d.Code));
+
+            // Get resource drops
+            var resources = Resources.Instance.GetAllResources();
+            var resourcesFromEvents = events.Where(e => e.Content.Type == MapContentType.Resource).Select(e => resources[e.Content.Code]);
+            var eventDrops = monsterEventDrops.Concat(resourcesFromEvents.SelectMany(r => r.Drops.Select(d => d.Code)));
+
+            foreach (var item in items)
+            {
+                var component = item.Craft.Items.FirstOrDefault(i => eventDrops.Any(d => i.Code == d));
+                if (component != null)
+                {
+                    var bankItem = bankItems.FirstOrDefault(x => x.Code == component.Code);
+                    if (bankItem == null || bankItem.Quantity < component.Quantity)
+                    {
+                        Console.WriteLine($"Filtering out {item.Code}({item.Level}) because it drops from an event which is not present");
+                    }
+                    else
+                    {
+                        result.Add(item);
+                    }
+                }
+                else
+                {
+                    result.Add(item);
+                }
+            }
+
+            return result;
         }
 
         private async Task DeleteStuff()
@@ -272,7 +314,7 @@ namespace Artifacts
                     var bankItem = bankItems.FirstOrDefault(x => x.Code == taskComponent.Code);
                     if (bankItem == null || bankItem.Quantity < taskComponent.Quantity)
                     {
-                        Console.WriteLine($"Filtering out {item.Code} because it needs {taskComponent.Code}, and we have none");
+                        Console.WriteLine($"Filtering out {item.Code}({item.Level}) because it needs {taskComponent.Code}, and we have none");
                     }
                     else
                     {
@@ -303,7 +345,7 @@ namespace Artifacts
                     var bankItem = bankItems.FirstOrDefault(x => x.Code == component.Code);
                     if (bankItem == null || bankItem.Quantity < component.Quantity)
                     {
-                        Console.WriteLine($"Filtering out {item.Code} because it drops from a boss, and we have none");
+                        Console.WriteLine($"Filtering out {item.Code}({item.Level}) because it drops from a boss, and we have none");
                     }
                     else
                     {

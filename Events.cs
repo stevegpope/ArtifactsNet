@@ -9,6 +9,7 @@ namespace Artifacts
         private EventsApi _api;
         private static Configuration _config;
         private static HttpClient _httpClient;
+        private List<EventSchema> _events;
 
         internal static Events Instance => lazy.Value;
 
@@ -47,6 +48,21 @@ namespace Artifacts
             });
 
             return (events as StaticDataPageActiveEventSchema).Data;
+        }
+
+        internal async Task<List<EventSchema>> GetAllEvents()
+        {
+            if (_events == null)
+            {
+                var events = await Utils.ApiCallGet(async () =>
+                {
+                    return await _api.GetAllEventsEventsGetAsync();
+                });
+
+                _events = (events as StaticDataPageEventSchema).Data;
+            }
+
+            return _events;
         }
     }
 }

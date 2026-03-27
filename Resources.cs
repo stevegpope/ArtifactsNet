@@ -94,5 +94,10 @@ namespace Artifacts
 
             return null;
         }
+
+        internal Dictionary<string, ResourceSchema> GetAllResources()
+        {
+            return _cache;
+        }
     }
 }

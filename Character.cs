@@ -2212,23 +2212,32 @@ namespace Artifacts
 
             foreach (ConditionSchema condition in conditions)
             {
+                int characterLevel = 0;
                 if (condition.Code == "level")
                 {
-                    if (condition.Operator == ConditionOperator.Gt)
+                    characterLevel = Utils.Details[Name].Level;
+                }
+                else if (condition.Code.EndsWith("_level"))
+                {
+                    var skill = condition.Code.Substring(0, condition.Code.IndexOf('_'));
+                    characterLevel = GetSkillLevel(skill);
+                }
+
+                if (condition.Operator == ConditionOperator.Gt)
+                {
+                    if (characterLevel <= condition.Value)
                     {
-                        if (Utils.Details[Name].Level <= condition.Value)
-                        {
-                            return false;
-                        }
-                    }
-                    else if (condition.Operator == ConditionOperator.Eq)
-                    {
-                        if (Utils.Details[Name].Level != condition.Value)
-                        {
-                            return false;
-                        }
+                        return false;
                     }
                 }
+                else if (condition.Operator == ConditionOperator.Eq)
+                {
+                    if (characterLevel != condition.Value)
+                    {
+                        return false;
+                    }
+                }
+
             }
 
             return true;
